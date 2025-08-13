@@ -1,0 +1,838 @@
+<!-- templates/components/dynamic_table.html - Reusable Dynamic Table Component -->
+<div class="dynamic-table-container" data-table-id="{{ table_id or 'default' }}">
+    <!-- Table Controls -->
+    <div class="card mb-3">
+        <div class="card-header">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <h6 class="mb-0">
+                        <i class="bi bi-table"></i> {{ table_title or 'Data Table' }}
+                        <span class="badge bg-secondary ms-2" id="rowCount-{{ table_id }}">{{ data|length if data else 0 }} rows</span>
+                    </h6>
+                </div>
+                <div class="col-md-6 text-end">
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#columnModal-{{ table_id }}">
+                            <i class="bi bi-columns"></i> Columns
+                        </button>
+                        <button class="btn btn-outline-secondary" onclick="toggleFilters('{{ table_id }}')">
+                            <i class="bi bi-funnel"></i> Filters
+                        </button>
+                        <button class="btn btn-outline-secondary" onclick="exportTable('{{ table_id }}')">
+                            <i class="bi bi-download"></i> Export
+                        </button>
+                        <button class="btn btn-outline-secondary" onclick="resetTable('{{ table_id }}')">
+                            <i class="bi bi-arrow-clockwise"></i> Reset
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Filter Panel -->
+        <div class="card-body d-none" id="filterPanel-{{ table_id }}">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Search</label>
+                    <input type="text" class="form-control form-control-sm" 
+                           id="globalSearch-{{ table_id }}" 
+                           placeholder="Search all columns..."
+                           onkeyup="applyFilters('{{ table_id }}')">
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label">Quick Filters</label>
+                    <div id="quickFilters-{{ table_id }}" class="d-flex flex-wrap gap-2">
+                        <!-- Quick filters will be populated dynamically -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Column-specific filters -->
+            <div class="row g-3 mt-2" id="columnFilters-{{ table_id }}">
+                <!-- Column filters will be populated dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Table -->
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0" id="dataTable-{{ table_id }}">
+                <thead class="table-light">
+                    <tr id="tableHeader-{{ table_id }}">
+                        <!-- Headers will be populated dynamically -->
+                    </tr>
+                </thead>
+                <tbody id="tableBody-{{ table_id }}">
+                    <!-- Data will be populated dynamically -->
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Pagination -->
+        <div class="card-footer">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="small text-muted">Show:</span>
+                        <select class="form-select form-select-sm" style="width: auto;" 
+                                id="pageSize-{{ table_id }}" onchange="changePageSize('{{ table_id }}')">
+                            <option value="10">10</option>
+                            <option value="25" selected>25</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                        <span class="small text-muted">per page</span>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <nav>
+                        <ul class="pagination pagination-sm justify-content-end mb-0" id="pagination-{{ table_id }}">
+                            <!-- Pagination will be populated dynamically -->
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Column Selection Modal -->
+<div class="modal fade" id="columnModal-{{ table_id }}" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Configure Columns</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-6">
+                        <h6>Available Columns</h6>
+                        <div class="list-group" id="availableColumns-{{ table_id }}">
+                            <!-- Available columns will be populated -->
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <h6>Visible Columns</h6>
+                        <div class="list-group" id="visibleColumns-{{ table_id }}">
+                            <!-- Visible columns will be populated -->
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="saveColumnPrefs-{{ table_id }}">
+                        <label class="form-check-label" for="saveColumnPrefs-{{ table_id }}">
+                            Remember my column preferences
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="resetColumns('{{ table_id }}')">Reset to Default</button>
+                <button type="button" class="btn btn-primary" onclick="applyColumnChanges('{{ table_id }}')" data-bs-dismiss="modal">Apply Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.dynamic-table-container {
+    --primary-color: #2563eb;
+    --border-color: #e5e7eb;
+}
+
+.table th {
+    position: relative;
+    cursor: pointer;
+    user-select: none;
+    border-top: none;
+    font-weight: 600;
+    color: #374151;
+    background-color: #f9fafb !important;
+}
+
+.table th:hover {
+    background-color: #f3f4f6 !important;
+}
+
+.table th.sortable::after {
+    content: '\2195';
+    position: absolute;
+    right: 8px;
+    opacity: 0.3;
+    font-size: 0.8em;
+}
+
+.table th.sort-asc::after {
+    content: '\2191';
+    opacity: 1;
+    color: var(--primary-color);
+}
+
+.table th.sort-desc::after {
+    content: '\2193';
+    opacity: 1;
+    color: var(--primary-color);
+}
+
+.filter-input {
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 0.875rem;
+}
+
+.filter-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+.list-group-item.column-item {
+    cursor: move;
+    transition: all 0.2s;
+}
+
+.list-group-item.column-item:hover {
+    background-color: #f8f9fa;
+}
+
+.list-group-item.column-item.dragging {
+    opacity: 0.5;
+}
+
+.quick-filter-btn {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+}
+
+.table-row-highlight {
+    background-color: rgba(37, 99, 235, 0.05) !important;
+}
+
+.pagination-sm .page-link {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+@media (max-width: 768px) {
+    .dynamic-table-container .btn-group {
+        flex-direction: column;
+        width: 100%;
+    }
+    
+    .dynamic-table-container .btn-group .btn {
+        border-radius: 0.375rem !important;
+        margin-bottom: 0.25rem;
+    }
+}
+</style>
+
+<script>
+// Dynamic Table Management System
+class DynamicTable {
+    constructor(tableId, config = {}) {
+        this.tableId = tableId;
+        this.config = {
+            sortable: true,
+            filterable: true,
+            paginated: true,
+            exportable: true,
+            persistPreferences: true,
+            ...config
+        };
+        
+        this.data = [];
+        this.filteredData = [];
+        this.columns = [];
+        this.visibleColumns = [];
+        this.currentPage = 1;
+        this.pageSize = 25;
+        this.sortColumn = null;
+        this.sortDirection = 'asc';
+        this.filters = {};
+        
+        this.init();
+    }
+    
+    init() {
+        this.loadPreferences();
+        this.setupEventListeners();
+    }
+    
+    setData(data, columns) {
+        this.data = data || [];
+        this.columns = columns || [];
+        
+        if (this.visibleColumns.length === 0) {
+            this.visibleColumns = [...this.columns];
+        }
+        
+        this.filteredData = [...this.data];
+        this.setupColumnConfiguration();
+        this.setupFilters();
+        this.render();
+    }
+    
+    setupColumnConfiguration() {
+        const availableList = document.getElementById(`availableColumns-${this.tableId}`);
+        const visibleList = document.getElementById(`visibleColumns-${this.tableId}`);
+        
+        if (!availableList || !visibleList) return;
+        
+        // Clear existing items
+        availableList.innerHTML = '';
+        visibleList.innerHTML = '';
+        
+        // Populate available columns
+        this.columns.forEach(col => {
+            if (!this.visibleColumns.find(v => v.key === col.key)) {
+                const item = this.createColumnItem(col, 'available');
+                availableList.appendChild(item);
+            }
+        });
+        
+        // Populate visible columns
+        this.visibleColumns.forEach(col => {
+            const item = this.createColumnItem(col, 'visible');
+            visibleList.appendChild(item);
+        });
+        
+        this.setupDragAndDrop();
+    }
+    
+    createColumnItem(column, type) {
+        const item = document.createElement('div');
+        item.className = 'list-group-item column-item d-flex justify-content-between align-items-center';
+        item.draggable = true;
+        item.dataset.columnKey = column.key;
+        item.innerHTML = `
+            <div>
+                <i class="bi bi-grip-horizontal text-muted me-2"></i>
+                ${column.label}
+            </div>
+            <button class="btn btn-sm btn-outline-${type === 'visible' ? 'danger' : 'primary'}" 
+                    onclick="toggleColumn('${this.tableId}', '${column.key}')">
+                <i class="bi bi-${type === 'visible' ? 'eye-slash' : 'eye'}"></i>
+            </button>
+        `;
+        return item;
+    }
+    
+    setupDragAndDrop() {
+        const visibleList = document.getElementById(`visibleColumns-${this.tableId}`);
+        if (!visibleList) return;
+        
+        new Sortable(visibleList, {
+            animation: 150,
+            onEnd: () => {
+                this.updateColumnOrder();
+            }
+        });
+    }
+    
+    setupFilters() {
+        const quickFiltersContainer = document.getElementById(`quickFilters-${this.tableId}`);
+        const columnFiltersContainer = document.getElementById(`columnFilters-${this.tableId}`);
+        
+        if (!quickFiltersContainer || !columnFiltersContainer) return;
+        
+        // Clear existing filters
+        quickFiltersContainer.innerHTML = '';
+        columnFiltersContainer.innerHTML = '';
+        
+        // Setup quick filters based on data
+        this.setupQuickFilters(quickFiltersContainer);
+        
+        // Setup column-specific filters
+        this.setupColumnFilters(columnFiltersContainer);
+    }
+    
+    setupQuickFilters(container) {
+        // Example quick filters - customize based on your data
+        const commonFilters = [
+            { label: 'Recent', filter: (item) => this.isRecent(item.created_date || item.created_ts) },
+            { label: 'High Priority', filter: (item) => ['high', 'critical'].includes(item.priority) },
+            { label: 'Open', filter: (item) => ['open', 'active', 'in_progress'].includes(item.status) }
+        ];
+        
+        commonFilters.forEach(filterDef => {
+            const applicable = this.data.some(item => filterDef.filter(item));
+            if (applicable) {
+                const btn = document.createElement('button');
+                btn.className = 'btn btn-outline-secondary quick-filter-btn';
+                btn.textContent = filterDef.label;
+                btn.onclick = () => this.applyQuickFilter(filterDef.filter);
+                container.appendChild(btn);
+            }
+        });
+    }
+    
+    setupColumnFilters(container) {
+        this.visibleColumns.forEach((column, index) => {
+            if (!column.filterable) return;
+            
+            const colDiv = document.createElement('div');
+            colDiv.className = 'col-md-3';
+            
+            const filterType = this.getFilterType(column);
+            let filterHtml = '';
+            
+            switch (filterType) {
+                case 'select':
+                    const uniqueValues = [...new Set(this.data.map(item => item[column.key]).filter(Boolean))];
+                    filterHtml = `
+                        <select class="form-select form-select-sm filter-input" 
+                                data-column="${column.key}" onchange="applyFilters('${this.tableId}')">
+                            <option value="">All ${column.label}</option>
+                            ${uniqueValues.map(val => `<option value="${val}">${val}</option>`).join('')}
+                        </select>
+                    `;
+                    break;
+                case 'date':
+                    filterHtml = `
+                        <input type="date" class="form-control form-control-sm filter-input" 
+                               data-column="${column.key}" onchange="applyFilters('${this.tableId}')">
+                    `;
+                    break;
+                case 'number':
+                    filterHtml = `
+                        <div class="input-group input-group-sm">
+                            <input type="number" class="form-control filter-input" 
+                                   data-column="${column.key}" data-operator="gte" 
+                                   placeholder="Min" onchange="applyFilters('${this.tableId}')">
+                            <input type="number" class="form-control filter-input" 
+                                   data-column="${column.key}" data-operator="lte" 
+                                   placeholder="Max" onchange="applyFilters('${this.tableId}')">
+                        </div>
+                    `;
+                    break;
+                default:
+                    filterHtml = `
+                        <input type="text" class="form-control form-control-sm filter-input" 
+                               data-column="${column.key}" placeholder="Filter ${column.label}..." 
+                               onkeyup="applyFilters('${this.tableId}')">
+                    `;
+            }
+            
+            colDiv.innerHTML = `
+                <label class="form-label small">${column.label}</label>
+                ${filterHtml}
+            `;
+            
+            container.appendChild(colDiv);
+        });
+    }
+    
+    getFilterType(column) {
+        if (column.type) return column.type;
+        
+        // Auto-detect based on column key or data
+        const key = column.key.toLowerCase();
+        if (key.includes('date') || key.includes('time')) return 'date';
+        if (key.includes('count') || key.includes('score') || key.includes('number')) return 'number';
+        if (key === 'status' || key === 'priority' || key === 'type') return 'select';
+        return 'text';
+    }
+    
+    render() {
+        this.renderTable();
+        this.renderPagination();
+        this.updateRowCount();
+    }
+    
+    renderTable() {
+        const header = document.getElementById(`tableHeader-${this.tableId}`);
+        const body = document.getElementById(`tableBody-${this.tableId}`);
+        
+        if (!header || !body) return;
+        
+        // Render header
+        header.innerHTML = this.visibleColumns.map(col => `
+            <th class="${this.config.sortable ? 'sortable' : ''} ${this.sortColumn === col.key ? 'sort-' + this.sortDirection : ''}" 
+                onclick="${this.config.sortable ? `sortTable('${this.tableId}', '${col.key}')` : ''}">
+                ${col.label}
+            </th>
+        `).join('');
+        
+        // Render body
+        const startIndex = (this.currentPage - 1) * this.pageSize;
+        const endIndex = Math.min(startIndex + this.pageSize, this.filteredData.length);
+        const pageData = this.filteredData.slice(startIndex, endIndex);
+        
+        body.innerHTML = pageData.map(item => `
+            <tr onclick="selectRow('${this.tableId}', '${item.id || ''}')">
+                ${this.visibleColumns.map(col => `
+                    <td>${this.formatCellValue(item[col.key], col)}</td>
+                `).join('')}
+            </tr>
+        `).join('');
+    }
+    
+    formatCellValue(value, column) {
+        if (!value && value !== 0) return '-';
+        
+        switch (column.type) {
+            case 'date':
+                return new Date(value * 1000 || value).toLocaleDateString();
+            case 'badge':
+                const badgeClass = this.getBadgeClass(value, column);
+                return `<span class="badge bg-${badgeClass}">${value}</span>`;
+            case 'link':
+                return `<a href="${column.linkTemplate.replace('{id}', value)}">${value}</a>`;
+            case 'code':
+                return `<code>${value}</code>`;
+            default:
+                return String(value).length > 50 ? 
+                    String(value).substring(0, 50) + '...' : 
+                    String(value);
+        }
+    }
+    
+    getBadgeClass(value, column) {
+        if (column.badgeMap) return column.badgeMap[value] || 'secondary';
+        
+        // Default badge classes
+        const val = String(value).toLowerCase();
+        if (['complete', 'completed', 'resolved', 'success'].includes(val)) return 'success';
+        if (['open', 'active', 'in_progress'].includes(val)) return 'warning';
+        if (['failed', 'error', 'critical'].includes(val)) return 'danger';
+        if (['pending', 'draft'].includes(val)) return 'secondary';
+        return 'info';
+    }
+    
+    renderPagination() {
+        const pagination = document.getElementById(`pagination-${this.tableId}`);
+        if (!pagination || !this.config.paginated) return;
+        
+        const totalPages = Math.ceil(this.filteredData.length / this.pageSize);
+        if (totalPages <= 1) {
+            pagination.innerHTML = '';
+            return;
+        }
+        
+        const maxVisible = 5;
+        const startPage = Math.max(1, this.currentPage - Math.floor(maxVisible / 2));
+        const endPage = Math.min(totalPages, startPage + maxVisible - 1);
+        
+        let html = '';
+        
+        // Previous button
+        html += `
+            <li class="page-item ${this.currentPage === 1 ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="changePage('${this.tableId}', ${this.currentPage - 1})">
+                    <i class="bi bi-chevron-left"></i>
+                </a>
+            </li>
+        `;
+        
+        // Page numbers
+        for (let i = startPage; i <= endPage; i++) {
+            html += `
+                <li class="page-item ${i === this.currentPage ? 'active' : ''}">
+                    <a class="page-link" href="#" onclick="changePage('${this.tableId}', ${i})">${i}</a>
+                </li>
+            `;
+        }
+        
+        // Next button
+        html += `
+            <li class="page-item ${this.currentPage === totalPages ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="changePage('${this.tableId}', ${this.currentPage + 1})">
+                    <i class="bi bi-chevron-right"></i>
+                </a>
+            </li>
+        `;
+        
+        pagination.innerHTML = html;
+    }
+    
+    updateRowCount() {
+        const counter = document.getElementById(`rowCount-${this.tableId}`);
+        if (counter) {
+            const showing = Math.min(this.pageSize, this.filteredData.length - (this.currentPage - 1) * this.pageSize);
+            const start = this.filteredData.length > 0 ? (this.currentPage - 1) * this.pageSize + 1 : 0;
+            const end = (this.currentPage - 1) * this.pageSize + showing;
+            
+            counter.textContent = `${start}-${end} of ${this.filteredData.length} rows`;
+        }
+    }
+    
+    applyFilters() {
+        const globalSearch = document.getElementById(`globalSearch-${this.tableId}`)?.value.toLowerCase() || '';
+        
+        this.filteredData = this.data.filter(item => {
+            // Global search
+            if (globalSearch) {
+                const searchText = this.visibleColumns
+                    .map(col => String(item[col.key] || ''))
+                    .join(' ')
+                    .toLowerCase();
+                if (!searchText.includes(globalSearch)) return false;
+            }
+            
+            // Column-specific filters
+            return this.visibleColumns.every(col => {
+                const filterInputs = document.querySelectorAll(`.filter-input[data-column="${col.key}"]`);
+                return Array.from(filterInputs).every(input => {
+                    const filterValue = input.value;
+                    if (!filterValue) return true;
+                    
+                    const itemValue = String(item[col.key] || '').toLowerCase();
+                    const operator = input.dataset.operator || 'contains';
+                    
+                    switch (operator) {
+                        case 'gte': return Number(item[col.key]) >= Number(filterValue);
+                        case 'lte': return Number(item[col.key]) <= Number(filterValue);
+                        case 'exact': return itemValue === filterValue.toLowerCase();
+                        default: return itemValue.includes(filterValue.toLowerCase());
+                    }
+                });
+            });
+        });
+        
+        this.currentPage = 1;
+        this.render();
+    }
+    
+    sort(columnKey) {
+        if (this.sortColumn === columnKey) {
+            this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            this.sortColumn = columnKey;
+            this.sortDirection = 'asc';
+        }
+        
+        this.filteredData.sort((a, b) => {
+            let aVal = a[columnKey];
+            let bVal = b[columnKey];
+            
+            // Handle different data types
+            if (typeof aVal === 'string') aVal = aVal.toLowerCase();
+            if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+            
+            if (aVal < bVal) return this.sortDirection === 'asc' ? -1 : 1;
+            if (aVal > bVal) return this.sortDirection === 'asc' ? 1 : -1;
+            return 0;
+        });
+        
+        this.render();
+    }
+    
+    changePage(page) {
+        const totalPages = Math.ceil(this.filteredData.length / this.pageSize);
+        this.currentPage = Math.max(1, Math.min(page, totalPages));
+        this.render();
+    }
+    
+    changePageSize(size) {
+        this.pageSize = parseInt(size);
+        this.currentPage = 1;
+        this.render();
+    }
+    
+    toggleColumn(columnKey) {
+        const columnIndex = this.visibleColumns.findIndex(col => col.key === columnKey);
+        
+        if (columnIndex > -1) {
+            // Remove from visible
+            this.visibleColumns.splice(columnIndex, 1);
+        } else {
+            // Add to visible
+            const column = this.columns.find(col => col.key === columnKey);
+            if (column) {
+                this.visibleColumns.push(column);
+            }
+        }
+        
+        this.setupColumnConfiguration();
+        this.setupFilters();
+        this.render();
+        this.savePreferences();
+    }
+    
+    export() {
+        const csv = this.generateCSV();
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${this.tableId}_export_${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+    }
+    
+    generateCSV() {
+        const headers = this.visibleColumns.map(col => col.label).join(',');
+        const rows = this.filteredData.map(item => 
+            this.visibleColumns.map(col => {
+                const value = item[col.key] || '';
+                return `"${String(value).replace(/"/g, '""')}"`;
+            }).join(',')
+        ).join('\n');
+        
+        return headers + '\n' + rows;
+    }
+    
+    reset() {
+        // Clear all filters
+        document.getElementById(`globalSearch-${this.tableId}`).value = '';
+        document.querySelectorAll(`#columnFilters-${this.tableId} .filter-input`).forEach(input => {
+            input.value = '';
+        });
+        
+        // Reset sorting
+        this.sortColumn = null;
+        this.sortDirection = 'asc';
+        
+        // Reset pagination
+        this.currentPage = 1;
+        this.pageSize = 25;
+        document.getElementById(`pageSize-${this.tableId}`).value = '25';
+        
+        // Apply changes
+        this.filteredData = [...this.data];
+        this.render();
+    }
+    
+    savePreferences() {
+        if (!this.config.persistPreferences) return;
+        
+        const prefs = {
+            visibleColumns: this.visibleColumns.map(col => col.key),
+            pageSize: this.pageSize,
+            sortColumn: this.sortColumn,
+            sortDirection: this.sortDirection
+        };
+        
+        localStorage.setItem(`tablePrefs_${this.tableId}`, JSON.stringify(prefs));
+    }
+    
+    loadPreferences() {
+        if (!this.config.persistPreferences) return;
+        
+        const prefs = localStorage.getItem(`tablePrefs_${this.tableId}`);
+        if (prefs) {
+            try {
+                const parsed = JSON.parse(prefs);
+                this.pageSize = parsed.pageSize || this.pageSize;
+                this.sortColumn = parsed.sortColumn;
+                this.sortDirection = parsed.sortDirection || 'asc';
+                
+                // Note: visibleColumns will be set when setData is called
+            } catch (e) {
+                console.warn('Failed to load table preferences:', e);
+            }
+        }
+    }
+    
+    setupEventListeners() {
+        // Prevent form submission on enter in filter inputs
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && e.target.classList.contains('filter-input')) {
+                e.preventDefault();
+                this.applyFilters();
+            }
+        });
+    }
+    
+    isRecent(date, days = 30) {
+        if (!date) return false;
+        const dateObj = new Date(typeof date === 'number' ? date * 1000 : date);
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - days);
+        return dateObj >= cutoff;
+    }
+    
+    applyQuickFilter(filterFn) {
+        this.filteredData = this.data.filter(filterFn);
+        this.currentPage = 1;
+        this.render();
+    }
+}
+
+// Global functions for template usage
+const tableInstances = {};
+
+function initTable(tableId, data, columns, config = {}) {
+    if (!tableInstances[tableId]) {
+        tableInstances[tableId] = new DynamicTable(tableId, config);
+    }
+    tableInstances[tableId].setData(data, columns);
+    return tableInstances[tableId];
+}
+
+function applyFilters(tableId) {
+    tableInstances[tableId]?.applyFilters();
+}
+
+function sortTable(tableId, columnKey) {
+    tableInstances[tableId]?.sort(columnKey);
+}
+
+function changePage(tableId, page) {
+    tableInstances[tableId]?.changePage(page);
+}
+
+function changePageSize(tableId) {
+    const select = document.getElementById(`pageSize-${tableId}`);
+    tableInstances[tableId]?.changePageSize(select.value);
+}
+
+function toggleFilters(tableId) {
+    const panel = document.getElementById(`filterPanel-${tableId}`);
+    panel.classList.toggle('d-none');
+}
+
+function toggleColumn(tableId, columnKey) {
+    tableInstances[tableId]?.toggleColumn(columnKey);
+}
+
+function applyColumnChanges(tableId) {
+    // Column changes are applied immediately via toggleColumn
+    tableInstances[tableId]?.savePreferences();
+}
+
+function resetColumns(tableId) {
+    const instance = tableInstances[tableId];
+    if (instance) {
+        instance.visibleColumns = [...instance.columns];
+        instance.setupColumnConfiguration();
+        instance.setupFilters();
+        instance.render();
+        instance.savePreferences();
+    }
+}
+
+function exportTable(tableId) {
+    tableInstances[tableId]?.export();
+}
+
+function resetTable(tableId) {
+    tableInstances[tableId]?.reset();
+}
+
+function selectRow(tableId, rowId) {
+    // Remove previous selection
+    document.querySelectorAll(`#dataTable-${tableId} tr.table-row-highlight`).forEach(row => {
+        row.classList.remove('table-row-highlight');
+    });
+    
+    // Add selection to current row
+    if (rowId) {
+        event.currentTarget.classList.add('table-row-highlight');
+    }
+}
+
+// Initialize Sortable.js if available
+if (typeof Sortable === 'undefined') {
+    // Add Sortable.js CDN if not already included
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js';
+    document.head.appendChild(script);
+}
+</script>
