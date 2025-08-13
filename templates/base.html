@@ -1,4 +1,4 @@
-<!-- templates/base.html -->
+<!-- templates/base.html - Updated with Enhanced Table Support -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,6 +7,8 @@
     <title>{% block title %}Smart EHS Management System{% endblock %}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    
+    <!-- Enhanced Table Styles -->
     <style>
         :root {
             --primary-color: #2563eb;
@@ -95,6 +97,101 @@
             color: #475569;
         }
 
+        /* Enhanced Table Styles */
+        .dynamic-table-container {
+            --primary-color: #2563eb;
+            --border-color: #e5e7eb;
+        }
+
+        .table th {
+            position: relative;
+            cursor: pointer;
+            user-select: none;
+            border-top: none;
+            font-weight: 600;
+            color: #374151;
+            background-color: #f9fafb !important;
+        }
+
+        .table th:hover {
+            background-color: #f3f4f6 !important;
+        }
+
+        .table th.sortable::after {
+            content: '\2195';
+            position: absolute;
+            right: 8px;
+            opacity: 0.3;
+            font-size: 0.8em;
+        }
+
+        .table th.sort-asc::after {
+            content: '\2191';
+            opacity: 1;
+            color: var(--primary-color);
+        }
+
+        .table th.sort-desc::after {
+            content: '\2193';
+            opacity: 1;
+            color: var(--primary-color);
+        }
+
+        .filter-input {
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 0.875rem;
+        }
+
+        .filter-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+        }
+
+        .list-group-item.column-item {
+            cursor: move;
+            transition: all 0.2s;
+        }
+
+        .list-group-item.column-item:hover {
+            background-color: #f8f9fa;
+        }
+
+        .list-group-item.column-item.dragging {
+            opacity: 0.5;
+        }
+
+        .quick-filter-btn {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            margin-right: 0.25rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .table-row-highlight {
+            background-color: rgba(37, 99, 235, 0.05) !important;
+        }
+
+        .pagination-sm .page-link {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .bulk-toolbar {
+            position: sticky;
+            top: 0;
+            z-index: 5;
+            background: white;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .filter-badge {
+            font-size: 0.75rem;
+            margin-right: 0.25rem;
+        }
+
         .chatbot-widget {
             position: fixed;
             bottom: 20px;
@@ -119,105 +216,6 @@
             box-shadow: 0 6px 20px rgba(0,0,0,0.4);
         }
 
-        .chatbot-panel {
-            position: absolute;
-            bottom: 80px;
-            right: 0;
-            width: 400px;
-            height: 600px;
-            background: white;
-            border-radius: 1rem;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
-            display: none;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        .chatbot-header {
-            background: linear-gradient(135deg, var(--primary-color), #3b82f6);
-            color: white;
-            padding: 1rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .chatbot-messages {
-            flex: 1;
-            padding: 1rem;
-            overflow-y: auto;
-            background: #f8fafc;
-        }
-
-        .chatbot-input {
-            padding: 1rem;
-            border-top: 1px solid #e5e7eb;
-        }
-
-        .message {
-            margin-bottom: 1rem;
-            animation: slideIn 0.3s ease-out;
-        }
-
-        .message-user {
-            text-align: right;
-        }
-
-        .message-bot {
-            text-align: left;
-        }
-
-        .message-bubble {
-            display: inline-block;
-            max-width: 80%;
-            padding: 0.75rem 1rem;
-            border-radius: 1rem;
-            word-wrap: break-word;
-        }
-
-        .message-user .message-bubble {
-            background: var(--primary-color);
-            color: white;
-            border-bottom-right-radius: 0.25rem;
-        }
-
-        .message-bot .message-bubble {
-            background: white;
-            color: #334155;
-            border: 1px solid #e2e8f0;
-            border-bottom-left-radius: 0.25rem;
-        }
-
-        .action-buttons {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-            margin-top: 0.75rem;
-        }
-
-        .action-btn {
-            background: rgba(37, 99, 235, 0.1);
-            border: 1px solid var(--primary-color);
-            color: var(--primary-color);
-            padding: 0.5rem 1rem;
-            border-radius: 1rem;
-            font-size: 0.9rem;
-            cursor: pointer;
-            transition: all 0.2s;
-            text-decoration: none;
-        }
-
-        .action-btn:hover {
-            background: var(--primary-color);
-            color: white;
-            transform: translateY(-1px);
-        }
-
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
         @media (max-width: 768px) {
             .sidebar {
                 transform: translateX(-100%);
@@ -233,9 +231,14 @@
                 padding: 1rem;
             }
             
-            .chatbot-panel {
-                width: 320px;
-                height: 500px;
+            .dynamic-table-container .btn-group {
+                flex-direction: column;
+                width: 100%;
+            }
+            
+            .dynamic-table-container .btn-group .btn {
+                border-radius: 0.375rem !important;
+                margin-bottom: 0.25rem;
             }
         }
     </style>
@@ -263,9 +266,11 @@
             </a>
             <a href="/risk/register" class="list-group-item list-group-item-action">
                 <i class="bi bi-graph-up me-2"></i> Risk Register
-            </a><a href="/sds" class="list-group-item list-group-item-action">
+            </a>
+            <a href="/sds" class="list-group-item list-group-item-action">
                 <i class="bi bi-file-earmark-text me-2"></i> SDS Library
-            </a></div>
+            </a>
+        </div>
 
         <!-- Quick Actions in Sidebar -->
         <div class="mt-auto p-3 border-top border-secondary">
@@ -313,276 +318,52 @@
 
     <!-- Floating Chatbot Widget (Global) -->
     <div class="chatbot-widget">
-        <div class="chatbot-panel" id="chatbotPanel">
-            <div class="chatbot-header">
-                <h6 class="mb-0">
-                    <i class="bi bi-robot me-2"></i>EHS Assistant
-                </h6>
-                <button class="btn btn-sm btn-outline-light" onclick="toggleChatbot()">
-                    <i class="bi bi-x"></i>
-                </button>
-            </div>
-            <div class="chatbot-messages" id="chatbotMessages">
-                <!-- Welcome message -->
-                <div class="message message-bot">
-                    <div class="message-bubble">
-                        <strong>👋 Hello! I'm your Smart EHS Assistant.</strong><br><br>
-                        I can help you with anything on this page or guide you to what you need:
-                        <div class="action-buttons">
-                            <button class="action-btn" onclick="sendChatMessage('Help with this page')">📖 Help with this page</button>
-                            <button class="action-btn" onclick="sendChatMessage('Report incident')">🚨 Report Incident</button>
-                            <button class="action-btn" onclick="sendChatMessage('Find SDS')">📋 Find SDS</button>
-                            <button class="action-btn" onclick="sendChatMessage('Safety concern')">🛡️ Safety Concern</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="chatbot-input">
-                <div class="input-group">
-                    <input type="text" class="form-control" id="chatInput" placeholder="Ask me anything about EHS..." onkeypress="handleChatKeyPress(event)">
-                    <button class="btn btn-primary" onclick="sendChatMessage()">
-                        <i class="bi bi-send"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
-        <button class="chatbot-toggle" onclick="toggleChatbot()" id="chatbotToggle">
+        <button class="chatbot-toggle" onclick="openChatbot()" id="chatbotToggle" title="Open EHS Assistant">
             <i class="bi bi-robot"></i>
         </button>
     </div>
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Enhanced Table Utilities -->
+    <script src="{{ url_for('static', filename='js/table-utils.js') }}"></script>
     
     <script>
-        // Global chatbot functionality
-        let chatHistory = [];
-        let chatbotOpen = false;
+        // Global functions
+        let tableInstances = {};
 
         // Mobile sidebar toggle
         function toggleSidebar() {
             document.getElementById('sidebar').classList.toggle('show');
         }
 
-        // Global chatbot functions
-        function toggleChatbot() {
-            const panel = document.getElementById('chatbotPanel');
-            const toggle = document.getElementById('chatbotToggle');
-            
-            chatbotOpen = !chatbotOpen;
-            
-            if (chatbotOpen) {
-                panel.style.display = 'flex';
-                toggle.innerHTML = '<i class="bi bi-x"></i>';
-                document.getElementById('chatInput').focus();
-                
-                // Add context message if this is first time opening on a specific page
-                if (chatHistory.length === 1) { // Only welcome message
-                    addContextualWelcome();
-                }
-            } else {
-                panel.style.display = 'none';
-                toggle.innerHTML = '<i class="bi bi-robot"></i>';
-            }
+        // Chatbot integration
+        function openChatbot() {
+            window.open('/', '_blank');
         }
 
-        function addContextualWelcome() {
-            const currentPage = window.location.pathname;
-            let contextMessage = "";
-            
-            if (currentPage.includes('/incidents')) {
-                contextMessage = "I see you're on the Incidents page. I can help you report incidents, understand the process, or explain validation requirements.";
-            } else if (currentPage.includes('/safety-concerns')) {
-                contextMessage = "You're viewing Safety Concerns. I can help you submit observations, understand the OSCR process, or check on existing concerns.";
-            } else if (currentPage.includes('/capa')) {
-                contextMessage = "I notice you're working with CAPAs. I can help you create corrective actions, track progress, or explain the difference between corrective and preventive actions.";
-            } else if (currentPage.includes('/risk')) {
-                contextMessage = "You're on the Risk Management page. I can guide you through risk assessments, explain the ERC matrix, or help interpret risk scores.";
-else if (currentPage.includes('/sds')) {
-                contextMessage = "You're browsing the SDS Library. I can help you find specific chemicals, upload new documents, or answer questions about chemical safety.";
+        // Global table functions for backward compatibility
+        function initTable(tableId, data, columns, config = {}) {
+            if (!tableInstances[tableId]) {
+                tableInstances[tableId] = new DynamicTable(tableId, config);
             }
-            
-            if (contextMessage) {
-                setTimeout(() => {
-                    addChatMessage(contextMessage, 'bot');
-                }, 1000);
-            }
+            tableInstances[tableId].setData(data, columns);
+            return tableInstances[tableId];
         }
 
-        function handleChatKeyPress(event) {
-            if (event.key === 'Enter') {
-                sendChatMessage();
-            }
+        function applyFilters(tableId) {
+            tableInstances[tableId]?.applyFilters();
         }
 
-        function sendChatMessage(message) {
-            const input = document.getElementById('chatInput');
-            const userMessage = message || input.value.trim();
-            
-            if (!userMessage) return;
-            
-            // Add user message to chat
-            addChatMessage(userMessage, 'user');
-            
-            // Clear input if it was typed
-            if (!message) {
-                input.value = '';
-            }
-            
-            // Show typing indicator
-            showTypingIndicator();
-            
-            // Get current page context
-            const context = {
-                page: window.location.pathname,
-                timestamp: new Date().toISOString(),
-                history: chatHistory.slice(-5) // Last 5 exchanges for context
-            };
-            
-            // Send to chatbot API
-            fetch('/chat', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    message: userMessage,
-                    user_id: 'global_user',
-                    context: context
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                hideTypingIndicator();
-                addChatMessage(data.message, 'bot', data);
-                
-                // Store conversation in history
-                chatHistory.push({
-                    user: userMessage,
-                    bot: data.message,
-                    timestamp: new Date().toISOString()
-                });
-                
-                // Keep only last 20 exchanges
-                if (chatHistory.length > 20) {
-                    chatHistory = chatHistory.slice(-20);
-                }
-            })
-            .catch(error => {
-                hideTypingIndicator();
-                addChatMessage("I'm sorry, I'm having trouble connecting right now. Please try again or contact support if the issue persists.", 'bot');
-                console.error('Chat error:', error);
-            });
+        function sortTable(tableId, columnKey) {
+            tableInstances[tableId]?.sort(columnKey);
         }
 
-        function addChatMessage(message, sender, data = null) {
-            const messagesContainer = document.getElementById('chatbotMessages');
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message message-${sender}`;
-            
-            let messageContent = `<div class="message-bubble">${message}`;
-            
-            // Add action buttons if provided
-            if (data && data.actions) {
-                messageContent += '<div class="action-buttons">';
-                data.actions.forEach(action => {
-                    if (action.action === 'navigate') {
-                        messageContent += `<a href="${action.url}" class="action-btn">${action.text}</a>`;
-                    } else {
-                        messageContent += `<button class="action-btn" onclick="sendChatMessage('${action.text.replace(/'/g, "\\'")}')">${action.text}</button>`;
-                    }
-                });
-                messageContent += '</div>';
-            }
-            
-            // Add quick replies if provided
-            if (data && data.quick_replies) {
-                messageContent += '<div class="action-buttons">';
-                data.quick_replies.forEach(reply => {
-                    messageContent += `<button class="action-btn" onclick="sendChatMessage('${reply.replace(/'/g, "\\'")}')">${reply}</button>`;
-                });
-                messageContent += '</div>';
-            }
-            
-            messageContent += '</div>';
-            messageDiv.innerHTML = messageContent;
-            
-            messagesContainer.appendChild(messageDiv);
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        function changePage(tableId, page) {
+            tableInstances[tableId]?.changePage(page);
         }
 
-        function showTypingIndicator() {
-            const messagesContainer = document.getElementById('chatbotMessages');
-            const typingDiv = document.createElement('div');
-            typingDiv.className = 'message message-bot';
-            typingDiv.id = 'typingIndicator';
-            typingDiv.innerHTML = `
-                <div class="message-bubble">
-                    <div class="typing-dots">
-                        <span></span><span></span><span></span>
-                    </div>
-                </div>
-            `;
-            messagesContainer.appendChild(typingDiv);
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
-
-        function hideTypingIndicator() {
-            const typingIndicator = document.getElementById('typingIndicator');
-            if (typingIndicator) {
-                typingIndicator.remove();
-            }
-        }
-
-        // Auto-hide flash messages after 5 seconds
-        setTimeout(function() {
-            const alerts = document.querySelectorAll('.flash-messages .alert');
-            alerts.forEach(alert => {
-                if (alert.classList.contains('alert-success')) {
-                    alert.style.opacity = '0';
-                    setTimeout(() => alert.remove(), 300);
-                }
-            });
-        }, 5000);
-
-        // Add active class to current page in navigation
-        document.addEventListener('DOMContentLoaded', function() {
-            const currentPath = window.location.pathname;
-            const navLinks = document.querySelectorAll('.sidebar .list-group-item');
-            
-            navLinks.forEach(link => {
-                const href = link.getAttribute('href');
-                if (href === currentPath || 
-                    (currentPath !== '/' && href !== '/' && currentPath.startsWith(href))) {
-                    link.classList.add('active');
-                }
-            });
-        });
-
-        // CSS for typing indicator
-        const style = document.createElement('style');
-        style.textContent = `
-            .typing-dots {
-                display: flex;
-                gap: 4px;
-            }
-            .typing-dots span {
-                width: 8px;
-                height: 8px;
-                border-radius: 50%;
-                background: #6b7280;
-                animation: typing 1.4s infinite ease-in-out;
-            }
-            .typing-dots span:nth-child(1) { animation-delay: -0.32s; }
-            .typing-dots span:nth-child(2) { animation-delay: -0.16s; }
-            @keyframes typing {
-                0%, 80%, 100% { transform: scale(0.8); opacity: 0.5; }
-                40% { transform: scale(1); opacity: 1; }
-            }
-        `;
-        document.head.appendChild(style);
-    </script>
-
-    {% block scripts %}{% endblock %}
-</body>
-</html>
+        function changePageSize
