@@ -1,838 +1,1428 @@
-<!-- templates/components/dynamic_table.html - Reusable Dynamic Table Component -->
-<div class="dynamic-table-container" data-table-id="{{ table_id or 'default' }}">
-    <!-- Table Controls -->
-    <div class="card mb-3">
-        <div class="card-header">
-            <div class="row align-items-center">
-                <div class="col-md-6">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Dynamic Table Component</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .dynamic-table-container {
+            --primary-color: #2563eb;
+            --border-color: #e5e7eb;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+
+        .table-controls {
+            background: #f8fafc;
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .table th {
+            position: relative;
+            cursor: pointer;
+            user-select: none;
+            border-top: none;
+            font-weight: 600;
+            color: #374151;
+            background-color: #f9fafb !important;
+            white-space: nowrap;
+        }
+
+        .table th:hover {
+            background-color: #f3f4f6 !important;
+        }
+
+        .table th.sortable::after {
+            content: '\f294';
+            font-family: bootstrap-icons;
+            position: absolute;
+            right: 8px;
+            opacity: 0.3;
+            font-size: 0.8em;
+        }
+
+        .table th.sort-asc::after {
+            content: '\f293';
+            opacity: 1;
+            color: var(--primary-color);
+        }
+
+        .table th.sort-desc::after {
+            content: '\f296';
+            opacity: 1;
+            color: var(--primary-color);
+        }
+
+        .column-toggle-item {
+            display: flex;
+            align-items: center;
+            justify-content: between;
+            padding: 0.5rem;
+            border: 1px solid #dee2e6;
+            border-radius: 0.25rem;
+            background: white;
+            margin-bottom: 0.25rem;
+            cursor: move;
+            transition: all 0.2s;
+        }
+
+        .column-toggle-item:hover {
+            background: #f8f9fa;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .column-toggle-item.disabled {
+            opacity: 0.6;
+            background: #f8f9fa;
+        }
+
+        .filter-panel {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+
+        .filter-chip {
+            display: inline-flex;
+            align-items: center;
+            background: var(--primary-color);
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 1rem;
+            font-size: 0.875rem;
+            margin-right: 0.5rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .filter-chip button {
+            background: none;
+            border: none;
+            color: white;
+            margin-left: 0.25rem;
+            cursor: pointer;
+        }
+
+        .table-loading {
+            position: relative;
+            opacity: 0.6;
+        }
+
+        .table-loading::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255,255,255,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .search-highlight {
+            background-color: yellow;
+            font-weight: bold;
+        }
+
+        .export-options {
+            display: none;
+            position: absolute;
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 1000;
+            min-width: 200px;
+        }
+
+        .export-options.show {
+            display: block;
+        }
+
+        .advanced-filters {
+            border-top: 1px solid #dee2e6;
+            padding-top: 1rem;
+            margin-top: 1rem;
+        }
+
+        @media (max-width: 768px) {
+            .table-controls {
+                padding: 0.75rem;
+            }
+            
+            .btn-group {
+                flex-direction: column;
+                width: 100%;
+            }
+            
+            .btn-group .btn {
+                border-radius: 0.375rem !important;
+                margin-bottom: 0.25rem;
+            }
+            
+            .table-responsive {
+                font-size: 0.875rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid py-4">
+        <!-- Demo Data Setup -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <h2>Enhanced Dynamic Table Component</h2>
+                <p class="text-muted">Fully featured table with column management, advanced filtering, sorting, and export capabilities.</p>
+            </div>
+        </div>
+
+        <!-- Enhanced Dynamic Table -->
+        <div class="dynamic-table-container" data-table-id="demo-table">
+            <!-- Table Controls -->
+            <div class="table-controls">
+                <div class="row align-items-center g-3">
+                    <div class="col-md-6">
+                        <h5 class="mb-0">
+                            <i class="bi bi-table"></i> Demo Table
+                            <span class="badge bg-secondary ms-2" id="rowCount">0 rows</span>
+                        </h5>
+                    </div>
+                    <div class="col-md-6 text-end">
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-secondary" onclick="toggleColumns()">
+                                <i class="bi bi-columns"></i> Columns
+                            </button>
+                            <button class="btn btn-outline-secondary" onclick="toggleFilters()">
+                                <i class="bi bi-funnel"></i> Filters
+                            </button>
+                            <div class="dropdown">
+                                <button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                                    <i class="bi bi-download"></i> Export
+                                </button>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="#" onclick="exportTable('csv')">
+                                        <i class="bi bi-filetype-csv"></i> CSV
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="#" onclick="exportTable('json')">
+                                        <i class="bi bi-filetype-json"></i> JSON
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="#" onclick="exportTable('excel')">
+                                        <i class="bi bi-file-earmark-excel"></i> Excel
+                                    </a></li>
+                                </ul>
+                            </div>
+                            <button class="btn btn-outline-secondary" onclick="resetTable()">
+                                <i class="bi bi-arrow-clockwise"></i> Reset
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Search -->
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="bi bi-search"></i></span>
+                            <input type="text" class="form-control" id="globalSearch" 
+                                   placeholder="Search across all columns...">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button class="btn btn-sm btn-outline-primary" onclick="applyQuickFilter('recent')">
+                                Recent
+                            </button>
+                            <button class="btn btn-sm btn-outline-warning" onclick="applyQuickFilter('high-priority')">
+                                High Priority
+                            </button>
+                            <button class="btn btn-sm btn-outline-success" onclick="applyQuickFilter('completed')">
+                                Completed
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="clearFilters()">
+                                Clear All
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Active Filters Display -->
+                <div id="activeFilters" class="mt-3" style="display: none;">
+                    <small class="text-muted">Active filters:</small>
+                    <div id="filterChips" class="mt-1"></div>
+                </div>
+            </div>
+
+            <!-- Column Management Panel -->
+            <div id="columnPanel" class="card mb-3" style="display: none;">
+                <div class="card-header">
                     <h6 class="mb-0">
-                        <i class="bi bi-table"></i> {{ table_title or 'Data Table' }}
-                        <span class="badge bg-secondary ms-2" id="rowCount-{{ table_id }}">{{ data|length if data else 0 }} rows</span>
+                        <i class="bi bi-columns"></i> Manage Columns
+                        <button class="btn btn-sm btn-outline-secondary float-end" onclick="resetColumns()">
+                            Reset Default
+                        </button>
                     </h6>
                 </div>
-                <div class="col-md-6 text-end">
-                    <div class="btn-group btn-group-sm">
-                        <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#columnModal-{{ table_id }}">
-                            <i class="bi bi-columns"></i> Columns
-                        </button>
-                        <button class="btn btn-outline-secondary" onclick="toggleFilters('{{ table_id }}')">
-                            <i class="bi bi-funnel"></i> Filters
-                        </button>
-                        <button class="btn btn-outline-secondary" onclick="exportTable('{{ table_id }}')">
-                            <i class="bi bi-download"></i> Export
-                        </button>
-                        <button class="btn btn-outline-secondary" onclick="resetTable('{{ table_id }}')">
-                            <i class="bi bi-arrow-clockwise"></i> Reset
-                        </button>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Available Columns</h6>
+                            <div id="availableColumns" class="column-list">
+                                <!-- Available columns will be populated here -->
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Visible Columns</h6>
+                            <div id="visibleColumns" class="column-list">
+                                <!-- Visible columns will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="saveColumnPrefs" checked>
+                            <label class="form-check-label" for="saveColumnPrefs">
+                                Remember my column preferences
+                            </label>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-        
-        <!-- Filter Panel -->
-        <div class="card-body d-none" id="filterPanel-{{ table_id }}">
-            <div class="row g-3">
-                <div class="col-md-4">
-                    <label class="form-label">Search</label>
-                    <input type="text" class="form-control form-control-sm" 
-                           id="globalSearch-{{ table_id }}" 
-                           placeholder="Search all columns..."
-                           onkeyup="applyFilters('{{ table_id }}')">
+
+            <!-- Advanced Filters Panel -->
+            <div id="filterPanel" class="filter-panel" style="display: none;">
+                <h6><i class="bi bi-funnel"></i> Advanced Filters</h6>
+                <div class="row g-3" id="columnFilters">
+                    <!-- Column-specific filters will be populated here -->
                 </div>
-                <div class="col-md-8">
-                    <label class="form-label">Quick Filters</label>
-                    <div id="quickFilters-{{ table_id }}" class="d-flex flex-wrap gap-2">
-                        <!-- Quick filters will be populated dynamically -->
+                
+                <div class="advanced-filters">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Date Range</label>
+                            <div class="input-group">
+                                <input type="date" class="form-control" id="dateFrom">
+                                <input type="date" class="form-control" id="dateTo">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Custom Filter</label>
+                            <input type="text" class="form-control" id="customFilter" 
+                                   placeholder="Advanced search...">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Actions</label>
+                            <div class="d-grid">
+                                <button class="btn btn-primary" onclick="applyAdvancedFilters()">
+                                    Apply Filters
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
-            
-            <!-- Column-specific filters -->
-            <div class="row g-3 mt-2" id="columnFilters-{{ table_id }}">
-                <!-- Column filters will be populated dynamically -->
+
+            <!-- Main Table -->
+            <div class="card">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0" id="dataTable">
+                        <thead class="table-light">
+                            <tr id="tableHeader">
+                                <!-- Headers will be populated dynamically -->
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                            <!-- Data will be populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Table Footer with Pagination -->
+                <div class="card-footer">
+                    <div class="row align-items-center">
+                        <div class="col-md-6">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="small text-muted">Show:</span>
+                                <select class="form-select form-select-sm" style="width: auto;" 
+                                        id="pageSize" onchange="changePageSize()">
+                                    <option value="10">10</option>
+                                    <option value="25" selected>25</option>
+                                    <option value="50">50</option>
+                                    <option value="100">100</option>
+                                </select>
+                                <span class="small text-muted">per page</span>
+                                <span class="small text-muted ms-3" id="tableInfo">0-0 of 0 rows</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <nav>
+                                <ul class="pagination pagination-sm justify-content-end mb-0" id="pagination">
+                                    <!-- Pagination will be populated dynamically -->
+                                </ul>
+                            </nav>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Table -->
-    <div class="card">
-        <div class="table-responsive">
-            <table class="table table-hover mb-0" id="dataTable-{{ table_id }}">
-                <thead class="table-light">
-                    <tr id="tableHeader-{{ table_id }}">
-                        <!-- Headers will be populated dynamically -->
-                    </tr>
-                </thead>
-                <tbody id="tableBody-{{ table_id }}">
-                    <!-- Data will be populated dynamically -->
-                </tbody>
-            </table>
-        </div>
-        
-        <!-- Pagination -->
-        <div class="card-footer">
-            <div class="row align-items-center">
-                <div class="col-md-6">
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="small text-muted">Show:</span>
-                        <select class="form-select form-select-sm" style="width: auto;" 
-                                id="pageSize-{{ table_id }}" onchange="changePageSize('{{ table_id }}')">
-                            <option value="10">10</option>
-                            <option value="25" selected>25</option>
-                            <option value="50">50</option>
-                            <option value="100">100</option>
-                        </select>
-                        <span class="small text-muted">per page</span>
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <nav>
-                        <ul class="pagination pagination-sm justify-content-end mb-0" id="pagination-{{ table_id }}">
-                            <!-- Pagination will be populated dynamically -->
-                        </ul>
-                    </nav>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Column Selection Modal -->
-<div class="modal fade" id="columnModal-{{ table_id }}" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Configure Columns</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="row">
-                    <div class="col-6">
-                        <h6>Available Columns</h6>
-                        <div class="list-group" id="availableColumns-{{ table_id }}">
-                            <!-- Available columns will be populated -->
-                        </div>
-                    </div>
-                    <div class="col-6">
-                        <h6>Visible Columns</h6>
-                        <div class="list-group" id="visibleColumns-{{ table_id }}">
-                            <!-- Visible columns will be populated -->
-                        </div>
-                    </div>
-                </div>
-                <div class="mt-3">
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="saveColumnPrefs-{{ table_id }}">
-                        <label class="form-check-label" for="saveColumnPrefs-{{ table_id }}">
-                            Remember my column preferences
-                        </label>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="resetColumns('{{ table_id }}')">Reset to Default</button>
-                <button type="button" class="btn btn-primary" onclick="applyColumnChanges('{{ table_id }}')" data-bs-dismiss="modal">Apply Changes</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<style>
-.dynamic-table-container {
-    --primary-color: #2563eb;
-    --border-color: #e5e7eb;
-}
-
-.table th {
-    position: relative;
-    cursor: pointer;
-    user-select: none;
-    border-top: none;
-    font-weight: 600;
-    color: #374151;
-    background-color: #f9fafb !important;
-}
-
-.table th:hover {
-    background-color: #f3f4f6 !important;
-}
-
-.table th.sortable::after {
-    content: '\2195';
-    position: absolute;
-    right: 8px;
-    opacity: 0.3;
-    font-size: 0.8em;
-}
-
-.table th.sort-asc::after {
-    content: '\2191';
-    opacity: 1;
-    color: var(--primary-color);
-}
-
-.table th.sort-desc::after {
-    content: '\2193';
-    opacity: 1;
-    color: var(--primary-color);
-}
-
-.filter-input {
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    padding: 4px 8px;
-    font-size: 0.875rem;
-}
-
-.filter-input:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
-}
-
-.list-group-item.column-item {
-    cursor: move;
-    transition: all 0.2s;
-}
-
-.list-group-item.column-item:hover {
-    background-color: #f8f9fa;
-}
-
-.list-group-item.column-item.dragging {
-    opacity: 0.5;
-}
-
-.quick-filter-btn {
-    font-size: 0.75rem;
-    padding: 0.25rem 0.5rem;
-}
-
-.table-row-highlight {
-    background-color: rgba(37, 99, 235, 0.05) !important;
-}
-
-.pagination-sm .page-link {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.875rem;
-}
-
-@media (max-width: 768px) {
-    .dynamic-table-container .btn-group {
-        flex-direction: column;
-        width: 100%;
-    }
-    
-    .dynamic-table-container .btn-group .btn {
-        border-radius: 0.375rem !important;
-        margin-bottom: 0.25rem;
-    }
-}
-</style>
-
-<script>
-// Dynamic Table Management System
-class DynamicTable {
-    constructor(tableId, config = {}) {
-        this.tableId = tableId;
-        this.config = {
-            sortable: true,
-            filterable: true,
-            paginated: true,
-            exportable: true,
-            persistPreferences: true,
-            ...config
-        };
-        
-        this.data = [];
-        this.filteredData = [];
-        this.columns = [];
-        this.visibleColumns = [];
-        this.currentPage = 1;
-        this.pageSize = 25;
-        this.sortColumn = null;
-        this.sortDirection = 'asc';
-        this.filters = {};
-        
-        this.init();
-    }
-    
-    init() {
-        this.loadPreferences();
-        this.setupEventListeners();
-    }
-    
-    setData(data, columns) {
-        this.data = data || [];
-        this.columns = columns || [];
-        
-        if (this.visibleColumns.length === 0) {
-            this.visibleColumns = [...this.columns];
-        }
-        
-        this.filteredData = [...this.data];
-        this.setupColumnConfiguration();
-        this.setupFilters();
-        this.render();
-    }
-    
-    setupColumnConfiguration() {
-        const availableList = document.getElementById(`availableColumns-${this.tableId}`);
-        const visibleList = document.getElementById(`visibleColumns-${this.tableId}`);
-        
-        if (!availableList || !visibleList) return;
-        
-        // Clear existing items
-        availableList.innerHTML = '';
-        visibleList.innerHTML = '';
-        
-        // Populate available columns
-        this.columns.forEach(col => {
-            if (!this.visibleColumns.find(v => v.key === col.key)) {
-                const item = this.createColumnItem(col, 'available');
-                availableList.appendChild(item);
-            }
-        });
-        
-        // Populate visible columns
-        this.visibleColumns.forEach(col => {
-            const item = this.createColumnItem(col, 'visible');
-            visibleList.appendChild(item);
-        });
-        
-        this.setupDragAndDrop();
-    }
-    
-    createColumnItem(column, type) {
-        const item = document.createElement('div');
-        item.className = 'list-group-item column-item d-flex justify-content-between align-items-center';
-        item.draggable = true;
-        item.dataset.columnKey = column.key;
-        item.innerHTML = `
-            <div>
-                <i class="bi bi-grip-horizontal text-muted me-2"></i>
-                ${column.label}
-            </div>
-            <button class="btn btn-sm btn-outline-${type === 'visible' ? 'danger' : 'primary'}" 
-                    onclick="toggleColumn('${this.tableId}', '${column.key}')">
-                <i class="bi bi-${type === 'visible' ? 'eye-slash' : 'eye'}"></i>
-            </button>
-        `;
-        return item;
-    }
-    
-    setupDragAndDrop() {
-        const visibleList = document.getElementById(`visibleColumns-${this.tableId}`);
-        if (!visibleList) return;
-        
-        new Sortable(visibleList, {
-            animation: 150,
-            onEnd: () => {
-                this.updateColumnOrder();
-            }
-        });
-    }
-    
-    setupFilters() {
-        const quickFiltersContainer = document.getElementById(`quickFilters-${this.tableId}`);
-        const columnFiltersContainer = document.getElementById(`columnFilters-${this.tableId}`);
-        
-        if (!quickFiltersContainer || !columnFiltersContainer) return;
-        
-        // Clear existing filters
-        quickFiltersContainer.innerHTML = '';
-        columnFiltersContainer.innerHTML = '';
-        
-        // Setup quick filters based on data
-        this.setupQuickFilters(quickFiltersContainer);
-        
-        // Setup column-specific filters
-        this.setupColumnFilters(columnFiltersContainer);
-    }
-    
-    setupQuickFilters(container) {
-        // Example quick filters - customize based on your data
-        const commonFilters = [
-            { label: 'Recent', filter: (item) => this.isRecent(item.created_date || item.created_ts) },
-            { label: 'High Priority', filter: (item) => ['high', 'critical'].includes(item.priority) },
-            { label: 'Open', filter: (item) => ['open', 'active', 'in_progress'].includes(item.status) }
-        ];
-        
-        commonFilters.forEach(filterDef => {
-            const applicable = this.data.some(item => filterDef.filter(item));
-            if (applicable) {
-                const btn = document.createElement('button');
-                btn.className = 'btn btn-outline-secondary quick-filter-btn';
-                btn.textContent = filterDef.label;
-                btn.onclick = () => this.applyQuickFilter(filterDef.filter);
-                container.appendChild(btn);
-            }
-        });
-    }
-    
-    setupColumnFilters(container) {
-        this.visibleColumns.forEach((column, index) => {
-            if (!column.filterable) return;
-            
-            const colDiv = document.createElement('div');
-            colDiv.className = 'col-md-3';
-            
-            const filterType = this.getFilterType(column);
-            let filterHtml = '';
-            
-            switch (filterType) {
-                case 'select':
-                    const uniqueValues = [...new Set(this.data.map(item => item[column.key]).filter(Boolean))];
-                    filterHtml = `
-                        <select class="form-select form-select-sm filter-input" 
-                                data-column="${column.key}" onchange="applyFilters('${this.tableId}')">
-                            <option value="">All ${column.label}</option>
-                            ${uniqueValues.map(val => `<option value="${val}">${val}</option>`).join('')}
-                        </select>
-                    `;
-                    break;
-                case 'date':
-                    filterHtml = `
-                        <input type="date" class="form-control form-control-sm filter-input" 
-                               data-column="${column.key}" onchange="applyFilters('${this.tableId}')">
-                    `;
-                    break;
-                case 'number':
-                    filterHtml = `
-                        <div class="input-group input-group-sm">
-                            <input type="number" class="form-control filter-input" 
-                                   data-column="${column.key}" data-operator="gte" 
-                                   placeholder="Min" onchange="applyFilters('${this.tableId}')">
-                            <input type="number" class="form-control filter-input" 
-                                   data-column="${column.key}" data-operator="lte" 
-                                   placeholder="Max" onchange="applyFilters('${this.tableId}')">
-                        </div>
-                    `;
-                    break;
-                default:
-                    filterHtml = `
-                        <input type="text" class="form-control form-control-sm filter-input" 
-                               data-column="${column.key}" placeholder="Filter ${column.label}..." 
-                               onkeyup="applyFilters('${this.tableId}')">
-                    `;
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <script>
+        // Enhanced Dynamic Table Class
+        class EnhancedDynamicTable {
+            constructor(containerId, options = {}) {
+                this.containerId = containerId;
+                this.container = document.querySelector(`[data-table-id="${containerId}"]`);
+                
+                // Configuration
+                this.options = {
+                    sortable: true,
+                    filterable: true,
+                    paginated: true,
+                    exportable: true,
+                    persistPreferences: true,
+                    selectable: false,
+                    pageSize: 25,
+                    searchHighlight: true,
+                    ...options
+                };
+                
+                // Data and state
+                this.originalData = [];
+                this.filteredData = [];
+                this.columns = [];
+                this.visibleColumns = [];
+                this.currentPage = 1;
+                this.sortColumn = null;
+                this.sortDirection = 'asc';
+                this.activeFilters = new Map();
+                this.searchTerm = '';
+                
+                this.init();
             }
             
-            colDiv.innerHTML = `
-                <label class="form-label small">${column.label}</label>
-                ${filterHtml}
-            `;
-            
-            container.appendChild(colDiv);
-        });
-    }
-    
-    getFilterType(column) {
-        if (column.type) return column.type;
-        
-        // Auto-detect based on column key or data
-        const key = column.key.toLowerCase();
-        if (key.includes('date') || key.includes('time')) return 'date';
-        if (key.includes('count') || key.includes('score') || key.includes('number')) return 'number';
-        if (key === 'status' || key === 'priority' || key === 'type') return 'select';
-        return 'text';
-    }
-    
-    render() {
-        this.renderTable();
-        this.renderPagination();
-        this.updateRowCount();
-    }
-    
-    renderTable() {
-        const header = document.getElementById(`tableHeader-${this.tableId}`);
-        const body = document.getElementById(`tableBody-${this.tableId}`);
-        
-        if (!header || !body) return;
-        
-        // Render header
-        header.innerHTML = this.visibleColumns.map(col => `
-            <th class="${this.config.sortable ? 'sortable' : ''} ${this.sortColumn === col.key ? 'sort-' + this.sortDirection : ''}" 
-                onclick="${this.config.sortable ? `sortTable('${this.tableId}', '${col.key}')` : ''}">
-                ${col.label}
-            </th>
-        `).join('');
-        
-        // Render body
-        const startIndex = (this.currentPage - 1) * this.pageSize;
-        const endIndex = Math.min(startIndex + this.pageSize, this.filteredData.length);
-        const pageData = this.filteredData.slice(startIndex, endIndex);
-        
-        body.innerHTML = pageData.map(item => `
-            <tr onclick="selectRow('${this.tableId}', '${item.id || ''}')">
-                ${this.visibleColumns.map(col => `
-                    <td>${this.formatCellValue(item[col.key], col)}</td>
-                `).join('')}
-            </tr>
-        `).join('');
-    }
-    
-    formatCellValue(value, column) {
-        if (!value && value !== 0) return '-';
-        
-        switch (column.type) {
-            case 'date':
-                return new Date(value * 1000 || value).toLocaleDateString();
-            case 'badge':
-                const badgeClass = this.getBadgeClass(value, column);
-                return `<span class="badge bg-${badgeClass}">${value}</span>`;
-            case 'link':
-                return `<a href="${column.linkTemplate.replace('{id}', value)}">${value}</a>`;
-            case 'code':
-                return `<code>${value}</code>`;
-            default:
-                return String(value).length > 50 ? 
-                    String(value).substring(0, 50) + '...' : 
-                    String(value);
-        }
-    }
-    
-    getBadgeClass(value, column) {
-        if (column.badgeMap) return column.badgeMap[value] || 'secondary';
-        
-        // Default badge classes
-        const val = String(value).toLowerCase();
-        if (['complete', 'completed', 'resolved', 'success'].includes(val)) return 'success';
-        if (['open', 'active', 'in_progress'].includes(val)) return 'warning';
-        if (['failed', 'error', 'critical'].includes(val)) return 'danger';
-        if (['pending', 'draft'].includes(val)) return 'secondary';
-        return 'info';
-    }
-    
-    renderPagination() {
-        const pagination = document.getElementById(`pagination-${this.tableId}`);
-        if (!pagination || !this.config.paginated) return;
-        
-        const totalPages = Math.ceil(this.filteredData.length / this.pageSize);
-        if (totalPages <= 1) {
-            pagination.innerHTML = '';
-            return;
-        }
-        
-        const maxVisible = 5;
-        const startPage = Math.max(1, this.currentPage - Math.floor(maxVisible / 2));
-        const endPage = Math.min(totalPages, startPage + maxVisible - 1);
-        
-        let html = '';
-        
-        // Previous button
-        html += `
-            <li class="page-item ${this.currentPage === 1 ? 'disabled' : ''}">
-                <a class="page-link" href="#" onclick="changePage('${this.tableId}', ${this.currentPage - 1})">
-                    <i class="bi bi-chevron-left"></i>
-                </a>
-            </li>
-        `;
-        
-        // Page numbers
-        for (let i = startPage; i <= endPage; i++) {
-            html += `
-                <li class="page-item ${i === this.currentPage ? 'active' : ''}">
-                    <a class="page-link" href="#" onclick="changePage('${this.tableId}', ${i})">${i}</a>
-                </li>
-            `;
-        }
-        
-        // Next button
-        html += `
-            <li class="page-item ${this.currentPage === totalPages ? 'disabled' : ''}">
-                <a class="page-link" href="#" onclick="changePage('${this.tableId}', ${this.currentPage + 1})">
-                    <i class="bi bi-chevron-right"></i>
-                </a>
-            </li>
-        `;
-        
-        pagination.innerHTML = html;
-    }
-    
-    updateRowCount() {
-        const counter = document.getElementById(`rowCount-${this.tableId}`);
-        if (counter) {
-            const showing = Math.min(this.pageSize, this.filteredData.length - (this.currentPage - 1) * this.pageSize);
-            const start = this.filteredData.length > 0 ? (this.currentPage - 1) * this.pageSize + 1 : 0;
-            const end = (this.currentPage - 1) * this.pageSize + showing;
-            
-            counter.textContent = `${start}-${end} of ${this.filteredData.length} rows`;
-        }
-    }
-    
-    applyFilters() {
-        const globalSearch = document.getElementById(`globalSearch-${this.tableId}`)?.value.toLowerCase() || '';
-        
-        this.filteredData = this.data.filter(item => {
-            // Global search
-            if (globalSearch) {
-                const searchText = this.visibleColumns
-                    .map(col => String(item[col.key] || ''))
-                    .join(' ')
-                    .toLowerCase();
-                if (!searchText.includes(globalSearch)) return false;
+            init() {
+                this.setupEventListeners();
+                this.loadPreferences();
+                this.setupSortable();
             }
             
-            // Column-specific filters
-            return this.visibleColumns.every(col => {
-                const filterInputs = document.querySelectorAll(`.filter-input[data-column="${col.key}"]`);
-                return Array.from(filterInputs).every(input => {
-                    const filterValue = input.value;
-                    if (!filterValue) return true;
-                    
-                    const itemValue = String(item[col.key] || '').toLowerCase();
-                    const operator = input.dataset.operator || 'contains';
-                    
-                    switch (operator) {
-                        case 'gte': return Number(item[col.key]) >= Number(filterValue);
-                        case 'lte': return Number(item[col.key]) <= Number(filterValue);
-                        case 'exact': return itemValue === filterValue.toLowerCase();
-                        default: return itemValue.includes(filterValue.toLowerCase());
+            setData(data, columns) {
+                this.originalData = Array.isArray(data) ? [...data] : [];
+                this.columns = Array.isArray(columns) ? [...columns] : [];
+                
+                // Set default visible columns if not already set
+                if (this.visibleColumns.length === 0) {
+                    this.visibleColumns = [...this.columns];
+                }
+                
+                this.filteredData = [...this.originalData];
+                this.setupColumnManagement();
+                this.setupFilters();
+                this.render();
+                this.updateRowCount();
+            }
+            
+            setupEventListeners() {
+                // Global search
+                const globalSearch = document.getElementById('globalSearch');
+                if (globalSearch) {
+                    globalSearch.addEventListener('input', (e) => {
+                        this.searchTerm = e.target.value;
+                        this.applyAllFilters();
+                    });
+                }
+                
+                // Page size change
+                const pageSize = document.getElementById('pageSize');
+                if (pageSize) {
+                    pageSize.addEventListener('change', () => {
+                        this.options.pageSize = parseInt(pageSize.value);
+                        this.currentPage = 1;
+                        this.render();
+                    });
+                }
+            }
+            
+            setupColumnManagement() {
+                const availableColumns = document.getElementById('availableColumns');
+                const visibleColumns = document.getElementById('visibleColumns');
+                
+                if (!availableColumns || !visibleColumns) return;
+                
+                // Clear existing
+                availableColumns.innerHTML = '';
+                visibleColumns.innerHTML = '';
+                
+                // Populate available columns (hidden ones)
+                this.columns.forEach(column => {
+                    if (!this.visibleColumns.find(vc => vc.key === column.key)) {
+                        const item = this.createColumnToggleItem(column, false);
+                        availableColumns.appendChild(item);
                     }
                 });
-            });
-        });
-        
-        this.currentPage = 1;
-        this.render();
-    }
-    
-    sort(columnKey) {
-        if (this.sortColumn === columnKey) {
-            this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
-        } else {
-            this.sortColumn = columnKey;
-            this.sortDirection = 'asc';
-        }
-        
-        this.filteredData.sort((a, b) => {
-            let aVal = a[columnKey];
-            let bVal = b[columnKey];
-            
-            // Handle different data types
-            if (typeof aVal === 'string') aVal = aVal.toLowerCase();
-            if (typeof bVal === 'string') bVal = bVal.toLowerCase();
-            
-            if (aVal < bVal) return this.sortDirection === 'asc' ? -1 : 1;
-            if (aVal > bVal) return this.sortDirection === 'asc' ? 1 : -1;
-            return 0;
-        });
-        
-        this.render();
-    }
-    
-    changePage(page) {
-        const totalPages = Math.ceil(this.filteredData.length / this.pageSize);
-        this.currentPage = Math.max(1, Math.min(page, totalPages));
-        this.render();
-    }
-    
-    changePageSize(size) {
-        this.pageSize = parseInt(size);
-        this.currentPage = 1;
-        this.render();
-    }
-    
-    toggleColumn(columnKey) {
-        const columnIndex = this.visibleColumns.findIndex(col => col.key === columnKey);
-        
-        if (columnIndex > -1) {
-            // Remove from visible
-            this.visibleColumns.splice(columnIndex, 1);
-        } else {
-            // Add to visible
-            const column = this.columns.find(col => col.key === columnKey);
-            if (column) {
-                this.visibleColumns.push(column);
-            }
-        }
-        
-        this.setupColumnConfiguration();
-        this.setupFilters();
-        this.render();
-        this.savePreferences();
-    }
-    
-    export() {
-        const csv = this.generateCSV();
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${this.tableId}_export_${new Date().toISOString().split('T')[0]}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-    }
-    
-    generateCSV() {
-        const headers = this.visibleColumns.map(col => col.label).join(',');
-        const rows = this.filteredData.map(item => 
-            this.visibleColumns.map(col => {
-                const value = item[col.key] || '';
-                return `"${String(value).replace(/"/g, '""')}"`;
-            }).join(',')
-        ).join('\n');
-        
-        return headers + '\n' + rows;
-    }
-    
-    reset() {
-        // Clear all filters
-        document.getElementById(`globalSearch-${this.tableId}`).value = '';
-        document.querySelectorAll(`#columnFilters-${this.tableId} .filter-input`).forEach(input => {
-            input.value = '';
-        });
-        
-        // Reset sorting
-        this.sortColumn = null;
-        this.sortDirection = 'asc';
-        
-        // Reset pagination
-        this.currentPage = 1;
-        this.pageSize = 25;
-        document.getElementById(`pageSize-${this.tableId}`).value = '25';
-        
-        // Apply changes
-        this.filteredData = [...this.data];
-        this.render();
-    }
-    
-    savePreferences() {
-        if (!this.config.persistPreferences) return;
-        
-        const prefs = {
-            visibleColumns: this.visibleColumns.map(col => col.key),
-            pageSize: this.pageSize,
-            sortColumn: this.sortColumn,
-            sortDirection: this.sortDirection
-        };
-        
-        localStorage.setItem(`tablePrefs_${this.tableId}`, JSON.stringify(prefs));
-    }
-    
-    loadPreferences() {
-        if (!this.config.persistPreferences) return;
-        
-        const prefs = localStorage.getItem(`tablePrefs_${this.tableId}`);
-        if (prefs) {
-            try {
-                const parsed = JSON.parse(prefs);
-                this.pageSize = parsed.pageSize || this.pageSize;
-                this.sortColumn = parsed.sortColumn;
-                this.sortDirection = parsed.sortDirection || 'asc';
                 
-                // Note: visibleColumns will be set when setData is called
-            } catch (e) {
-                console.warn('Failed to load table preferences:', e);
+                // Populate visible columns
+                this.visibleColumns.forEach(column => {
+                    const item = this.createColumnToggleItem(column, true);
+                    visibleColumns.appendChild(item);
+                });
+            }
+            
+            createColumnToggleItem(column, isVisible) {
+                const item = document.createElement('div');
+                item.className = 'column-toggle-item';
+                item.draggable = true;
+                item.dataset.columnKey = column.key;
+                
+                item.innerHTML = `
+                    <div class="d-flex align-items-center justify-content-between w-100">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-grip-vertical text-muted me-2"></i>
+                            <span>${column.label}</span>
+                        </div>
+                        <button class="btn btn-sm btn-outline-${isVisible ? 'danger' : 'primary'}" 
+                                onclick="toggleColumnVisibility('${column.key}')">
+                            <i class="bi bi-${isVisible ? 'eye-slash' : 'eye'}"></i>
+                        </button>
+                    </div>
+                `;
+                
+                return item;
+            }
+            
+            setupSortable() {
+                const visibleColumns = document.getElementById('visibleColumns');
+                if (visibleColumns && typeof Sortable !== 'undefined') {
+                    new Sortable(visibleColumns, {
+                        animation: 150,
+                        onEnd: () => {
+                            this.updateColumnOrder();
+                        }
+                    });
+                }
+            }
+            
+            setupFilters() {
+                const columnFilters = document.getElementById('columnFilters');
+                if (!columnFilters) return;
+                
+                columnFilters.innerHTML = '';
+                
+                this.visibleColumns.forEach(column => {
+                    if (!column.filterable) return;
+                    
+                    const filterDiv = document.createElement('div');
+                    filterDiv.className = 'col-md-4';
+                    
+                    const filterType = this.getFilterType(column);
+                    let filterHtml = '';
+                    
+                    switch (filterType) {
+                        case 'select':
+                            const uniqueValues = this.getUniqueValues(column.key);
+                            filterHtml = `
+                                <select class="form-select form-select-sm" 
+                                        data-column="${column.key}" 
+                                        onchange="applyColumnFilter('${column.key}', this.value)">
+                                    <option value="">All ${column.label}</option>
+                                    ${uniqueValues.map(val => 
+                                        `<option value="${val}">${val}</option>`
+                                    ).join('')}
+                                </select>
+                            `;
+                            break;
+                        case 'date':
+                            filterHtml = `
+                                <input type="date" class="form-control form-control-sm" 
+                                       data-column="${column.key}" 
+                                       onchange="applyColumnFilter('${column.key}', this.value)">
+                            `;
+                            break;
+                        case 'number':
+                            filterHtml = `
+                                <div class="input-group input-group-sm">
+                                    <input type="number" class="form-control" placeholder="Min" 
+                                           data-column="${column.key}" data-operator="gte"
+                                           onchange="applyRangeFilter('${column.key}')">
+                                    <input type="number" class="form-control" placeholder="Max"
+                                           data-column="${column.key}" data-operator="lte" 
+                                           onchange="applyRangeFilter('${column.key}')">
+                                </div>
+                            `;
+                            break;
+                        default:
+                            filterHtml = `
+                                <input type="text" class="form-control form-control-sm" 
+                                       placeholder="Filter ${column.label}..." 
+                                       data-column="${column.key}"
+                                       oninput="applyColumnFilter('${column.key}', this.value)">
+                            `;
+                    }
+                    
+                    filterDiv.innerHTML = `
+                        <label class="form-label small">${column.label}</label>
+                        ${filterHtml}
+                    `;
+                    
+                    columnFilters.appendChild(filterDiv);
+                });
+            }
+            
+            getFilterType(column) {
+                if (column.filterType) return column.filterType;
+                
+                const key = column.key.toLowerCase();
+                if (key.includes('date') || key.includes('time') || column.type === 'date') return 'date';
+                if (key.includes('count') || key.includes('score') || column.type === 'number') return 'number';
+                if (key === 'status' || key === 'priority' || key === 'type' || column.type === 'select') return 'select';
+                return 'text';
+            }
+            
+            getUniqueValues(columnKey) {
+                const values = new Set();
+                this.originalData.forEach(item => {
+                    const value = this.getNestedValue(item, columnKey);
+                    if (value !== null && value !== undefined && value !== '') {
+                        values.add(String(value));
+                    }
+                });
+                return Array.from(values).sort();
+            }
+            
+            getNestedValue(obj, path) {
+                return path.split('.').reduce((current, key) => 
+                    current && current[key] !== undefined ? current[key] : null, obj);
+            }
+            
+            render() {
+                this.renderTable();
+                this.renderPagination();
+                this.updateTableInfo();
+            }
+            
+            renderTable() {
+                const header = document.getElementById('tableHeader');
+                const body = document.getElementById('tableBody');
+                
+                if (!header || !body) return;
+                
+                // Render header
+                header.innerHTML = this.visibleColumns.map(column => `
+                    <th class="${this.options.sortable && column.sortable !== false ? 'sortable' : ''} 
+                               ${this.sortColumn === column.key ? 'sort-' + this.sortDirection : ''}" 
+                        onclick="${this.options.sortable && column.sortable !== false ? `sortTable('${column.key}')` : ''}">
+                        ${column.label}
+                    </th>
+                `).join('');
+                
+                // Render body
+                const startIndex = (this.currentPage - 1) * this.options.pageSize;
+                const endIndex = Math.min(startIndex + this.options.pageSize, this.filteredData.length);
+                const pageData = this.filteredData.slice(startIndex, endIndex);
+                
+                body.innerHTML = pageData.map(item => `
+                    <tr onclick="selectRow('${item.id || Math.random()}', event)">
+                        ${this.visibleColumns.map(column => `
+                            <td>${this.formatCellValue(item, column)}</td>
+                        `).join('')}
+                    </tr>
+                `).join('');
+            }
+            
+            formatCellValue(item, column) {
+                let value = this.getNestedValue(item, column.key);
+                
+                if (value === null || value === undefined) return '-';
+                
+                // Apply custom formatter if available
+                if (column.format && typeof column.format === 'function') {
+                    return column.format(value, item);
+                }
+                
+                // Apply type-based formatting
+                switch (column.type) {
+                    case 'date':
+                        const date = new Date(typeof value === 'number' ? value * 1000 : value);
+                        return isNaN(date.getTime()) ? value : date.toLocaleDateString();
+                    case 'badge':
+                        const badgeClass = this.getBadgeClass(value, column);
+                        return `<span class="badge bg-${badgeClass}">${value}</span>`;
+                    case 'code':
+                        return `<code>${value}</code>`;
+                    case 'progress':
+                        const percentage = parseInt(value) || 0;
+                        const progressClass = percentage >= 80 ? 'success' : percentage >= 50 ? 'warning' : 'danger';
+                        return `
+                            <div class="d-flex align-items-center">
+                                <div class="progress flex-grow-1 me-2" style="height: 20px;">
+                                    <div class="progress-bar bg-${progressClass}" style="width: ${percentage}%"></div>
+                                </div>
+                                <small>${percentage}%</small>
+                            </div>
+                        `;
+                    case 'custom':
+                        return value; // Custom HTML
+                    default:
+                        let displayValue = String(value);
+                        if (displayValue.length > 50) {
+                            displayValue = displayValue.substring(0, 47) + '...';
+                        }
+                        
+                        // Highlight search terms
+                        if (this.options.searchHighlight && this.searchTerm) {
+                            const regex = new RegExp(`(${this.escapeRegex(this.searchTerm)})`, 'gi');
+                            displayValue = displayValue.replace(regex, '<span class="search-highlight">$1</span>');
+                        }
+                        
+                        return displayValue;
+                }
+            }
+            
+            getBadgeClass(value, column) {
+                if (column.badgeMap && column.badgeMap[value]) {
+                    return column.badgeMap[value];
+                }
+                
+                // Default badge classes
+                const val = String(value).toLowerCase();
+                if (['complete', 'completed', 'resolved', 'success', 'active'].includes(val)) return 'success';
+                if (['open', 'in_progress', 'pending', 'warning'].includes(val)) return 'warning';
+                if (['failed', 'error', 'critical', 'danger'].includes(val)) return 'danger';
+                if (['draft', 'inactive', 'secondary'].includes(val)) return 'secondary';
+                return 'primary';
+            }
+            
+            renderPagination() {
+                const pagination = document.getElementById('pagination');
+                if (!pagination || !this.options.paginated) return;
+                
+                const totalPages = Math.ceil(this.filteredData.length / this.options.pageSize);
+                if (totalPages <= 1) {
+                    pagination.innerHTML = '';
+                    return;
+                }
+                
+                const maxVisible = 5;
+                const startPage = Math.max(1, this.currentPage - Math.floor(maxVisible / 2));
+                const endPage = Math.min(totalPages, startPage + maxVisible - 1);
+                
+                let html = '';
+                
+                // Previous button
+                html += `
+                    <li class="page-item ${this.currentPage === 1 ? 'disabled' : ''}">
+                        <a class="page-link" href="#" onclick="changePage(${this.currentPage - 1})">
+                            <i class="bi bi-chevron-left"></i>
+                        </a>
+                    </li>
+                `;
+                
+                // First page
+                if (startPage > 1) {
+                    html += `<li class="page-item"><a class="page-link" href="#" onclick="changePage(1)">1</a></li>`;
+                    if (startPage > 2) {
+                        html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+                    }
+                }
+                
+                // Page numbers
+                for (let i = startPage; i <= endPage; i++) {
+                    html += `
+                        <li class="page-item ${i === this.currentPage ? 'active' : ''}">
+                            <a class="page-link" href="#" onclick="changePage(${i})">${i}</a>
+                        </li>
+                    `;
+                }
+                
+                // Last page
+                if (endPage < totalPages) {
+                    if (endPage < totalPages - 1) {
+                        html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+                    }
+                    html += `<li class="page-item"><a class="page-link" href="#" onclick="changePage(${totalPages})">${totalPages}</a></li>`;
+                }
+                
+                // Next button
+                html += `
+                    <li class="page-item ${this.currentPage === totalPages ? 'disabled' : ''}">
+                        <a class="page-link" href="#" onclick="changePage(${this.currentPage + 1})">
+                            <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </li>
+                `;
+                
+                pagination.innerHTML = html;
+            }
+            
+            updateTableInfo() {
+                const info = document.getElementById('tableInfo');
+                if (!info) return;
+                
+                const startIndex = (this.currentPage - 1) * this.options.pageSize + 1;
+                const endIndex = Math.min(this.currentPage * this.options.pageSize, this.filteredData.length);
+                const total = this.filteredData.length;
+                
+                if (total === 0) {
+                    info.textContent = 'No records found';
+                } else {
+                    info.textContent = `${startIndex}-${endIndex} of ${total} rows`;
+                }
+            }
+            
+            updateRowCount() {
+                const rowCount = document.getElementById('rowCount');
+                if (rowCount) {
+                    rowCount.textContent = `${this.filteredData.length} rows`;
+                }
+            }
+            
+            applyAllFilters() {
+                let filtered = [...this.originalData];
+                
+                // Apply global search
+                if (this.searchTerm) {
+                    const searchLower = this.searchTerm.toLowerCase();
+                    filtered = filtered.filter(item => {
+                        return this.visibleColumns.some(column => {
+                            const value = this.getNestedValue(item, column.key);
+                            return value && String(value).toLowerCase().includes(searchLower);
+                        });
+                    });
+                }
+                
+                // Apply column filters
+                this.activeFilters.forEach((filterValue, columnKey) => {
+                    if (filterValue && filterValue.trim() !== '') {
+                        filtered = filtered.filter(item => {
+                            const value = this.getNestedValue(item, columnKey);
+                            if (!value) return false;
+                            
+                            const valueStr = String(value).toLowerCase();
+                            const filterStr = String(filterValue).toLowerCase();
+                            
+                            return valueStr.includes(filterStr);
+                        });
+                    }
+                });
+                
+                this.filteredData = filtered;
+                this.currentPage = 1;
+                this.render();
+                this.updateRowCount();
+                this.updateActiveFiltersDisplay();
+            }
+            
+            sort(columnKey) {
+                if (this.sortColumn === columnKey) {
+                    this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+                } else {
+                    this.sortColumn = columnKey;
+                    this.sortDirection = 'asc';
+                }
+                
+                this.filteredData.sort((a, b) => {
+                    let aVal = this.getNestedValue(a, columnKey);
+                    let bVal = this.getNestedValue(b, columnKey);
+                    
+                    // Handle null/undefined values
+                    if (aVal === null || aVal === undefined) aVal = '';
+                    if (bVal === null || bVal === undefined) bVal = '';
+                    
+                    // Convert to strings for comparison
+                    if (typeof aVal === 'string') aVal = aVal.toLowerCase();
+                    if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+                    
+                    let result = 0;
+                    if (aVal < bVal) result = -1;
+                    else if (aVal > bVal) result = 1;
+                    
+                    return this.sortDirection === 'desc' ? -result : result;
+                });
+                
+                this.render();
+                this.savePreferences();
+            }
+            
+            changePage(page) {
+                const totalPages = Math.ceil(this.filteredData.length / this.options.pageSize);
+                this.currentPage = Math.max(1, Math.min(page, totalPages));
+                this.render();
+            }
+            
+            toggleColumnVisibility(columnKey) {
+                const columnIndex = this.visibleColumns.findIndex(col => col.key === columnKey);
+                
+                if (columnIndex > -1) {
+                    // Remove from visible
+                    this.visibleColumns.splice(columnIndex, 1);
+                } else {
+                    // Add to visible
+                    const column = this.columns.find(col => col.key === columnKey);
+                    if (column) {
+                        this.visibleColumns.push(column);
+                    }
+                }
+                
+                this.setupColumnManagement();
+                this.setupFilters();
+                this.render();
+                this.savePreferences();
+            }
+            
+            updateColumnOrder() {
+                const visibleColumnsEl = document.getElementById('visibleColumns');
+                if (!visibleColumnsEl) return;
+                
+                const newOrder = [];
+                Array.from(visibleColumnsEl.children).forEach(item => {
+                    const columnKey = item.dataset.columnKey;
+                    const column = this.columns.find(col => col.key === columnKey);
+                    if (column) {
+                        newOrder.push(column);
+                    }
+                });
+                
+                this.visibleColumns = newOrder;
+                this.render();
+                this.savePreferences();
+            }
+            
+            updateActiveFiltersDisplay() {
+                const activeFiltersEl = document.getElementById('activeFilters');
+                const filterChipsEl = document.getElementById('filterChips');
+                
+                if (!activeFiltersEl || !filterChipsEl) return;
+                
+                const hasFilters = this.activeFilters.size > 0 || this.searchTerm;
+                
+                if (hasFilters) {
+                    activeFiltersEl.style.display = 'block';
+                    let chips = '';
+                    
+                    if (this.searchTerm) {
+                        chips += `
+                            <span class="filter-chip">
+                                Search: "${this.searchTerm}"
+                                <button onclick="clearSearchFilter()">&times;</button>
+                            </span>
+                        `;
+                    }
+                    
+                    this.activeFilters.forEach((value, columnKey) => {
+                        const column = this.columns.find(col => col.key === columnKey);
+                        const columnLabel = column ? column.label : columnKey;
+                        chips += `
+                            <span class="filter-chip">
+                                ${columnLabel}: "${value}"
+                                <button onclick="clearColumnFilter('${columnKey}')">&times;</button>
+                            </span>
+                        `;
+                    });
+                    
+                    filterChipsEl.innerHTML = chips;
+                } else {
+                    activeFiltersEl.style.display = 'none';
+                }
+            }
+            
+            export(format = 'csv') {
+                const data = this.getExportData();
+                
+                switch (format) {
+                    case 'csv':
+                        this.exportCSV(data);
+                        break;
+                    case 'json':
+                        this.exportJSON(data);
+                        break;
+                    case 'excel':
+                        this.exportExcel(data);
+                        break;
+                }
+            }
+            
+            getExportData() {
+                return {
+                    headers: this.visibleColumns.map(col => col.label),
+                    rows: this.filteredData.map(item => 
+                        this.visibleColumns.map(col => {
+                            const value = this.getNestedValue(item, col.key);
+                            if (Array.isArray(value)) return value.join('; ');
+                            if (typeof value === 'object') return JSON.stringify(value);
+                            return String(value || '');
+                        })
+                    )
+                };
+            }
+            
+            exportCSV(data) {
+                const csv = [
+                    data.headers.join(','),
+                    ...data.rows.map(row => 
+                        row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
+                    )
+                ].join('\n');
+                
+                this.downloadFile(csv, 'table-export.csv', 'text/csv');
+            }
+            
+            exportJSON(data) {
+                const jsonData = {
+                    exported_at: new Date().toISOString(),
+                    total_records: this.filteredData.length,
+                    columns: data.headers,
+                    data: this.filteredData
+                };
+                
+                this.downloadFile(
+                    JSON.stringify(jsonData, null, 2), 
+                    'table-export.json', 
+                    'application/json'
+                );
+            }
+            
+            exportExcel(data) {
+                // Simple Excel export (would need a library like SheetJS for full Excel support)
+                const csv = [
+                    data.headers.join('\t'),
+                    ...data.rows.map(row => row.join('\t'))
+                ].join('\n');
+                
+                this.downloadFile(csv, 'table-export.xlsx', 'application/vnd.ms-excel');
+            }
+            
+            downloadFile(content, filename, mimeType) {
+                const blob = new Blob([content], { type: mimeType });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }
+            
+            reset() {
+                this.searchTerm = '';
+                this.activeFilters.clear();
+                this.sortColumn = null;
+                this.sortDirection = 'asc';
+                this.currentPage = 1;
+                
+                // Reset form inputs
+                document.getElementById('globalSearch').value = '';
+                document.querySelectorAll('[data-column]').forEach(input => {
+                    input.value = '';
+                });
+                
+                this.filteredData = [...this.originalData];
+                this.render();
+                this.updateRowCount();
+                this.updateActiveFiltersDisplay();
+            }
+            
+            savePreferences() {
+                if (!this.options.persistPreferences) return;
+                
+                const preferences = {
+                    visibleColumns: this.visibleColumns.map(col => col.key),
+                    sortColumn: this.sortColumn,
+                    sortDirection: this.sortDirection,
+                    pageSize: this.options.pageSize
+                };
+                
+                localStorage.setItem(`table-prefs-${this.containerId}`, JSON.stringify(preferences));
+            }
+            
+            loadPreferences() {
+                if (!this.options.persistPreferences) return;
+                
+                const saved = localStorage.getItem(`table-prefs-${this.containerId}`);
+                if (saved) {
+                    try {
+                        const preferences = JSON.parse(saved);
+                        this.sortColumn = preferences.sortColumn;
+                        this.sortDirection = preferences.sortDirection || 'asc';
+                        this.options.pageSize = preferences.pageSize || 25;
+                        
+                        // Restore page size
+                        const pageSizeEl = document.getElementById('pageSize');
+                        if (pageSizeEl) {
+                            pageSizeEl.value = this.options.pageSize;
+                        }
+                        
+                        // Note: visibleColumns will be restored when setData is called
+                    } catch (e) {
+                        console.warn('Failed to load table preferences:', e);
+                    }
+                }
+            }
+            
+            escapeRegex(string) {
+                return string.replace(/[.*+?^${}()|[\]\\]/g, '\\            applyAllFil');
             }
         }
-    }
-    
-    setupEventListeners() {
-        // Prevent form submission on enter in filter inputs
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && e.target.classList.contains('filter-input')) {
-                e.preventDefault();
-                this.applyFilters();
+        
+        // Global table instance
+        let demoTable;
+        
+        // Demo data
+        const demoData = [
+            {
+                id: 'INC-001',
+                title: 'Workplace Injury - Cut on Hand',
+                type: 'injury',
+                status: 'complete',
+                priority: 'high',
+                created_date: '2024-01-15',
+                assigned_to: 'John Smith',
+                completeness: 95,
+                location: 'Building A',
+                reporter: 'Jane Doe'
+            },
+            {
+                id: 'INC-002',
+                title: 'Chemical Spill in Lab',
+                type: 'environmental',
+                status: 'in_progress',
+                priority: 'critical',
+                created_date: '2024-01-16',
+                assigned_to: 'Mike Johnson',
+                completeness: 70,
+                location: 'Lab B',
+                reporter: 'Anonymous'
+            },
+            {
+                id: 'INC-003',
+                title: 'Equipment Malfunction',
+                type: 'property',
+                status: 'open',
+                priority: 'medium',
+                created_date: '2024-01-17',
+                assigned_to: 'Sarah Wilson',
+                completeness: 45,
+                location: 'Warehouse',
+                reporter: 'Bob Brown'
+            },
+            {
+                id: 'INC-004',
+                title: 'Near Miss - Fall Hazard',
+                type: 'near_miss',
+                status: 'complete',
+                priority: 'low',
+                created_date: '2024-01-18',
+                assigned_to: 'Tom Davis',
+                completeness: 100,
+                location: 'Stairwell C',
+                reporter: 'Lisa Green'
+            },
+            {
+                id: 'INC-005',
+                title: 'Vehicle Accident',
+                type: 'vehicle',
+                status: 'open',
+                priority: 'high',
+                created_date: '2024-01-19',
+                assigned_to: 'Alex Brown',
+                completeness: 30,
+                location: 'Parking Lot',
+                reporter: 'Chris White'
             }
+        ];
+        
+        // Demo columns configuration
+        const demoColumns = [
+            {
+                key: 'id',
+                label: 'Incident ID',
+                type: 'code',
+                filterable: true,
+                sortable: true
+            },
+            {
+                key: 'title',
+                label: 'Title',
+                type: 'text',
+                filterable: true,
+                sortable: true
+            },
+            {
+                key: 'type',
+                label: 'Type',
+                type: 'badge',
+                filterable: true,
+                sortable: true,
+                filterType: 'select',
+                badgeMap: {
+                    'injury': 'danger',
+                    'environmental': 'warning',
+                    'property': 'info',
+                    'near_miss': 'primary',
+                    'vehicle': 'secondary'
+                }
+            },
+            {
+                key: 'status',
+                label: 'Status',
+                type: 'badge',
+                filterable: true,
+                sortable: true,
+                filterType: 'select',
+                badgeMap: {
+                    'complete': 'success',
+                    'in_progress': 'warning',
+                    'open': 'secondary'
+                }
+            },
+            {
+                key: 'priority',
+                label: 'Priority',
+                type: 'badge',
+                filterable: true,
+                sortable: true,
+                filterType: 'select',
+                badgeMap: {
+                    'critical': 'danger',
+                    'high': 'warning',
+                    'medium': 'info',
+                    'low': 'secondary'
+                }
+            },
+            {
+                key: 'completeness',
+                label: 'Completeness',
+                type: 'progress',
+                filterable: true,
+                sortable: true,
+                filterType: 'number'
+            },
+            {
+                key: 'created_date',
+                label: 'Created Date',
+                type: 'date',
+                filterable: true,
+                sortable: true,
+                filterType: 'date'
+            },
+            {
+                key: 'assigned_to',
+                label: 'Assigned To',
+                type: 'text',
+                filterable: true,
+                sortable: true,
+                filterType: 'select'
+            },
+            {
+                key: 'location',
+                label: 'Location',
+                type: 'text',
+                filterable: true,
+                sortable: true
+            },
+            {
+                key: 'reporter',
+                label: 'Reporter',
+                type: 'text',
+                filterable: true,
+                sortable: true
+            }
+        ];
+        
+        // Initialize table when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            demoTable = new EnhancedDynamicTable('demo-table', {
+                sortable: true,
+                filterable: true,
+                paginated: true,
+                exportable: true,
+                persistPreferences: true,
+                searchHighlight: true,
+                pageSize: 25
+            });
+            
+            demoTable.setData(demoData, demoColumns);
         });
-    }
-    
-    isRecent(date, days = 30) {
-        if (!date) return false;
-        const dateObj = new Date(typeof date === 'number' ? date * 1000 : date);
-        const cutoff = new Date();
-        cutoff.setDate(cutoff.getDate() - days);
-        return dateObj >= cutoff;
-    }
-    
-    applyQuickFilter(filterFn) {
-        this.filteredData = this.data.filter(filterFn);
-        this.currentPage = 1;
-        this.render();
-    }
-}
-
-// Global functions for template usage
-const tableInstances = {};
-
-function initTable(tableId, data, columns, config = {}) {
-    if (!tableInstances[tableId]) {
-        tableInstances[tableId] = new DynamicTable(tableId, config);
-    }
-    tableInstances[tableId].setData(data, columns);
-    return tableInstances[tableId];
-}
-
-function applyFilters(tableId) {
-    tableInstances[tableId]?.applyFilters();
-}
-
-function sortTable(tableId, columnKey) {
-    tableInstances[tableId]?.sort(columnKey);
-}
-
-function changePage(tableId, page) {
-    tableInstances[tableId]?.changePage(page);
-}
-
-function changePageSize(tableId) {
-    const select = document.getElementById(`pageSize-${tableId}`);
-    tableInstances[tableId]?.changePageSize(select.value);
-}
-
-function toggleFilters(tableId) {
-    const panel = document.getElementById(`filterPanel-${tableId}`);
-    panel.classList.toggle('d-none');
-}
-
-function toggleColumn(tableId, columnKey) {
-    tableInstances[tableId]?.toggleColumn(columnKey);
-}
-
-function applyColumnChanges(tableId) {
-    // Column changes are applied immediately via toggleColumn
-    tableInstances[tableId]?.savePreferences();
-}
-
-function resetColumns(tableId) {
-    const instance = tableInstances[tableId];
-    if (instance) {
-        instance.visibleColumns = [...instance.columns];
-        instance.setupColumnConfiguration();
-        instance.setupFilters();
-        instance.render();
-        instance.savePreferences();
-    }
-}
-
-function exportTable(tableId) {
-    tableInstances[tableId]?.export();
-}
-
-function resetTable(tableId) {
-    tableInstances[tableId]?.reset();
-}
-
-function selectRow(tableId, rowId) {
-    // Remove previous selection
-    document.querySelectorAll(`#dataTable-${tableId} tr.table-row-highlight`).forEach(row => {
-        row.classList.remove('table-row-highlight');
-    });
-    
-    // Add selection to current row
-    if (rowId) {
-        event.currentTarget.classList.add('table-row-highlight');
-    }
-}
-
-// Initialize Sortable.js if available
-if (typeof Sortable === 'undefined') {
-    // Add Sortable.js CDN if not already included
-    const script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js';
-    document.head.appendChild(script);
-}
-</script>
+        
+        // Global functions for UI interactions
+        function toggleColumns() {
+            const panel = document.getElementById('columnPanel');
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        }
+        
+        function toggleFilters() {
+            const panel = document.getElementById('filterPanel');
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        }
+        
+        function resetColumns() {
+            if (demoTable) {
+                demoTable.visibleColumns = [...demoTable.columns];
+                demoTable.setupColumnManagement();
+                demoTable.setupFilters();
+                demoTable.render();
+                demoTable.savePreferences();
+            }
+        }
+        
+        function toggleColumnVisibility(columnKey) {
+            if (demoTable) {
+                demoTable.toggleColumnVisibility(columnKey);
+            }
+        }
+        
+        function sortTable(columnKey) {
+            if (demoTable) {
+                demoTable.sort(columnKey);
+            }
+        }
+        
+        function changePage(page) {
+            if (demoTable) {
+                demoTable.changePage(page);
+            }
+        }
+        
+        function changePageSize() {
+            if (demoTable) {
+                const pageSize = document.getElementById('pageSize');
+                demoTable.options.pageSize = parseInt(pageSize.value);
+                demoTable.currentPage = 1;
+                demoTable.render();
+                demoTable.savePreferences();
+            }
+        }
+        
+        function exportTable(format) {
+            if (demoTable) {
+                demoTable.export(format);
+            }
+        }
+        
+        function resetTable() {
+            if (demoTable) {
+                demoTable.reset();
+            }
+        }
+        
+        function applyColumnFilter(columnKey, value) {
+            if (demoTable) {
+                if (value && value.trim() !== '') {
+                    demoTable.activeFilters.set(columnKey, value);
+                } else {
+                    demoTable.activeFilters.delete(columnKey);
+                }
+                demoTable.applyAllFilters();
+            }
+        }
+        
+        function applyRangeFilter(columnKey) {
+            if (demoTable) {
+                const inputs = document.querySelectorAll(`[data-column="${columnKey}"]`);
+                const min = inputs[0]?.value;
+                const max = inputs[1]?.value;
+                
+                if (min || max) {
+                    const filterValue = `${min || '0'}-${max || '999999'}`;
+                    demoTable.activeFilters.set(columnKey, filterValue);
+                } else {
+                    demoTable.activeFilters.delete(columnKey);
+                }
+                demoTable.applyAllFilters();
+            }
+        }
+        
+        function applyQuickFilter(filterType) {
+            if (!demoTable) return;
+            
+            demoTable.reset(); // Clear existing filters first
+            
+            switch (filterType) {
+                case 'recent':
+                    const recentDate = new Date();
+                    recentDate.setDate(recentDate.getDate() - 7);
+                    demoTable.activeFilters.set('created_date', recentDate.toISOString().split('T')[0]);
+                    break;
+                case 'high-priority':
+                    demoTable.activeFilters.set('priority', 'high');
+                    break;
+                case 'completed':
+                    demoTable.activeFilters.set('status', 'complete');
+                    break;
+            }
+            
+            demoTable.applyAllFilters();
+        }
+        
+        function clearFilters() {
+            if (demoTable) {
+                demoTable.reset();
+            }
+        }
+        
+        function clearSearchFilter() {
+            if (demoTable) {
+                demoTable.searchTerm = '';
+                document.getElementById('globalSearch').value = '';
+                demoTable.applyAllFilters();
+            }
+        }
+        
+        function clearColumnFilter(columnKey) {
+            if (demoTable) {
+                demoTable.activeFilters.delete(columnKey);
+                
+                // Clear the corresponding input
+                const input = document.querySelector(`[data-column="${columnKey}"]`);
+                if (input) {
+                    input.value = '';
+                }
+                
+                demoTable.applyAllFilters();
+            }
+        }
+        
+        function selectRow(rowId, event) {
+            // Remove previous selections
+            document.querySelectorAll('#dataTable tbody tr').forEach(row => {
+                row.classList.remove('table-active');
+            });
+            
+            // Add selection to current row
+            if (event && event.currentTarget) {
+                event.currentTarget.classList.add('table-active');
+            }
+        }
+        
+        function applyAdvancedFilters() {
+            if (!demoTable) return;
+            
+            const dateFrom = document.getElementById('dateFrom').value;
+            const dateTo = document.getElementById('dateTo').value;
+            const customFilter = document.getElementById('customFilter').value;
+            
+            if (dateFrom) {
+                demoTable.activeFilters.set('created_date_from', dateFrom);
+            }
+            if (dateTo) {
+                demoTable.activeFilters.set('created_date_to', dateTo);
+            }
+            if (customFilter) {
+                demoTable.searchTerm = customFilter;
+                document.getElementById('globalSearch').value = customFilter;
+            }
+            
+            demoTable.applyAllFilters();
+        }
+    </script>
+</body>
+</html>
