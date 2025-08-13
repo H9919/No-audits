@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-3">Upload SDS</h3>
+<form method="post" enctype="multipart/form-data" class="card p-3">
+  <div class="mb-3">
+    <label class="form-label">Select PDF or ZIP</label>
+    <input class="form-control" type="file" name="file" required>
+  </div>
+  <button class="btn btn-primary">Upload</button>
+</form>
+{% endblock %}

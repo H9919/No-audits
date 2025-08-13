@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: smart-ehs
+    env: python
+    plan: free
+    region: oregon
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn app:app --workers=1 --threads=4 --timeout=120 --bind=0.0.0.0:$PORT --max-requests=1000 --max-requests-jitter=100"
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      # Disable SBERT to save memory
+      - key: ENABLE_SBERT
+        value: "false"
+      # Force Python 3.11
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      # Memory optimization
+      - key: PYTHONDONTWRITEBYTECODE
+        value: "1"
+    disk:
+      name: data
+      mountPath: /opt/render/project/src/data
+      sizeGB: 1  # Reduced from 10GB for free plan

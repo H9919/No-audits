@@ -1,0 +1,101 @@
+<!-- templates/risk_register.html -->
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3><i class="bi bi-graph-up text-info"></i> Risk Register</h3>
+    <a href="{{ url_for('risk.risk_assessment') }}" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> New Risk Assessment
+    </a>
+</div>
+
+<!-- Quick Stats -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-center bg-danger text-white">
+            <div class="card-body">
+                <h4>{{ stats.critical }}</h4>
+                <small>Critical Risk</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center bg-warning text-white">
+            <div class="card-body">
+                <h4>{{ stats.high }}</h4>
+                <small>High Risk</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center bg-info text-white">
+            <div class="card-body">
+                <h4>{{ stats.medium }}</h4>
+                <small>Medium Risk</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center bg-success text-white">
+            <div class="card-body">
+                <h4>{{ stats.low }}</h4>
+                <small>Low Risk</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Risk Assessments Table -->
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Title</th>
+                        <th>Description</th>
+                        <th>Risk Score</th>
+                        <th>Risk Level</th>
+                        <th>Created By</th>
+                        <th>Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for risk in risks %}
+                    <tr>
+                        <td><code>{{ risk.id[:8] }}</code></td>
+                        <td><strong>{{ risk.title }}</strong></td>
+                        <td>{{ risk.description[:100] }}{% if risk.description|length > 100 %}...{% endif %}</td>
+                        <td><span class="badge bg-dark">{{ risk.risk_score }}</span></td>
+                        <td>
+                            <span class="badge bg-{{ 'danger' if risk.risk_level == 'Critical' else ('warning' if risk.risk_level == 'High' else ('info' if risk.risk_level == 'Medium' else 'success')) }}">
+                                {{ risk.risk_level }}
+                            </span>
+                        </td>
+                        <td>{{ risk.created_by }}</td>
+                        <td>{{ moment(risk.created_date).format('YYYY-MM-DD') }}</td>
+                        <td>
+                            <a href="{{ url_for('risk.risk_detail', risk_id=risk.id) }}" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-eye"></i> View
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        {% if not risks %}
+        <div class="text-center py-5">
+            <i class="bi bi-graph-up fs-1 text-muted"></i>
+            <h5 class="text-muted mt-3">No Risk Assessments Found</h5>
+            <p class="text-muted">Risk assessments help identify and manage workplace hazards.</p>
+            <a href="{{ url_for('risk.risk_assessment') }}" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> Create First Risk Assessment
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

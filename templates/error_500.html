@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4">
+  <h1 class="h4 text-danger">Something went wrong</h1>
+  <p class="text-muted">An unexpected error occurred.</p>
+  {% if error %}<pre class="small border rounded p-2 bg-light">{{ error }}</pre>{% endif %}
+  <a class="btn btn-primary mt-2" href="/">Back to Home</a>
+</div>
+{% endblock %}

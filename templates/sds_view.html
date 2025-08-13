@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-3">SDS Detail</h3>
+<div class="row g-3">
+  <div class="col-md-8">
+    <div class="card p-3">
+      <h5>{{ rec.product_name }}</h5>
+      <p><strong>File:</strong> {{ rec.file_name }}</p>
+      <p><strong>ID:</strong> <code>{{ rec.id }}</code></p>
+      <div class="d-flex gap-2">
+        <a class="btn btn-primary" href="{{ url_for('sds.sds_download', sid=rec.id) }}">Download PDF</a>
+        <a class="btn btn-outline-dark" href="{{ url_for('sds.sds_chat', sid=rec.id) }}">Chat with this SDS</a>
+      </div>
+      <hr>
+      <p><strong>Text length:</strong> {{ rec.text_len }} chars</p>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card p-3">
+      <h6>QR Code</h6>
+      <img src="{{ url_for('sds.sds_qr_png', sid=rec.id) }}" alt="QR" class="img-fluid">
+      <small class="text-muted">Scans to this SDS page.</small>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

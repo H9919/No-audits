@@ -1,0 +1,129 @@
+<!-- templates/safety_concerns_list.html -->
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3><i class="bi bi-shield-exclamation text-warning"></i> Safety Concerns</h3>
+    <div>
+        <a href="{{ url_for('safety_concerns.new_concern') }}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> New Safety Concern
+        </a>
+        <a href="{{ url_for('safety_concerns.new_concern', anonymous='true') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-incognito"></i> Anonymous Report
+        </a>
+    </div>
+</div>
+
+<!-- Quick Stats -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-center bg-primary text-white">
+            <div class="card-body">
+                <h4>{{ stats.total }}</h4>
+                <small>Total Concerns</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center bg-warning text-white">
+            <div class="card-body">
+                <h4>{{ stats.open }}</h4>
+                <small>Open</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center bg-success text-white">
+            <div class="card-body">
+                <h4>{{ stats.resolved }}</h4>
+                <small>Resolved</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center bg-info text-white">
+            <div class="card-body">
+                <h4>{{ stats.this_month }}</h4>
+                <small>This Month</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Safety Concerns Table -->
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Title</th>
+                        <th>Type</th>
+                        <th>Location</th>
+                        <th>Hazard Type</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                        <th>Reporter</th>
+                        <th>Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for concern in concerns %}
+                    <tr>
+                        <td><code>{{ concern.id[:8] }}</code></td>
+                        <td>
+                            <strong>{{ concern.title }}</strong>
+                            {% if concern.description %}
+                            <br><small class="text-muted">{{ concern.description[:100] }}{% if concern.description|length > 100 %}...{% endif %}</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge bg-{{ 'info' if concern.type == 'concern' else 'success' }}">
+                                {{ concern.type|title }}
+                            </span>
+                        </td>
+                        <td>{{ concern.location or 'Not specified' }}</td>
+                        <td>{{ concern.hazard_type or 'General' }}</td>
+                        <td>
+                            <span class="badge bg-{{ 'danger' if concern.priority == 'high' else ('warning' if concern.priority == 'medium' else 'secondary') }}">
+                                {{ concern.priority|title }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge bg-{{ 'success' if concern.status == 'resolved' else ('warning' if concern.status == 'investigating' else 'secondary') }}">
+                                {{ concern.status|replace('_', ' ')|title }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if concern.anonymous %}
+                                <span class="text-muted">Anonymous</span>
+                            {% else %}
+                                {{ concern.reporter or 'Unknown' }}
+                            {% endif %}
+                        </td>
+                        <td>{{ moment(concern.created_date).format('YYYY-MM-DD') }}</td>
+                        <td>
+                            <a href="{{ url_for('safety_concerns.concern_detail', concern_id=concern.id) }}" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-eye"></i> View
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        {% if not concerns %}
+        <div class="text-center py-5">
+            <i class="bi bi-shield-exclamation fs-1 text-muted"></i>
+            <h5 class="text-muted mt-3">No Safety Concerns Found</h5>
+            <p class="text-muted">Safety observations help create a safer workplace for everyone.</p>
+            <a href="{{ url_for('safety_concerns.new_concern') }}" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> Report First Safety Concern
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

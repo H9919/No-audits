@@ -1,0 +1,289 @@
+<!-- templates/risk_assessment.html -->
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-4">Event Risk Classification (ERC)</h3>
+
+<div class="row">
+    <div class="col-md-8">
+        <form method="post" class="card p-4">
+            <div class="mb-3">
+                <label class="form-label">Risk Title</label>
+                <input type="text" class="form-control" name="title" required>
+            </div>
+            
+            <div class="mb-3">
+                <label class="form-label">Description</label>
+                <textarea class="form-control" name="description" rows="3"></textarea>
+            </div>
+            
+            <div class="mb-4">
+                <h5>Likelihood Assessment</h5>
+                <div class="row">
+                    {% for score, info in likelihood_scale.items() %}
+                    <div class="col-md-6 mb-2">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="likelihood" value="{{ score }}" id="likelihood{{ score }}">
+                            <label class="form-check-label" for="likelihood{{ score }}">
+                                <strong>{{ score }}: {{ info.label }}</strong><br>
+                                <small class="text-muted">{{ info.description }}</small>
+                            </label>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <div class="mb-4">
+                <h5>Severity Assessment</h5>
+                {% for category, severities in severity_scale.items() %}
+                <div class="mb-3">
+                    <h6>{{ category.title() }}</h6>
+                    <select class="form-select" name="severity_{{ category }}">
+                        <option value="0">Select severity level</option>
+                        {% for score, description in severities.items() %}
+                        <option value="{{ score }}">{{ score }}: {{ description }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <button type="submit" class="btn btn-primary">Calculate Risk Score</button>
+        </form>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h6>Risk Matrix Guide</h6>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Score Range</th>
+                                <th>Risk Level</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="table-danger">
+                                <td>80-100</td>
+                                <td>Critical</td>
+                            </tr>
+                            <tr class="table-warning">
+                                <td>60-79</td>
+                                <td>High</td>
+                            </tr>
+                            <tr class="table-info">
+                                <td>40-59</td>
+                                <td>Medium</td>
+                            </tr>
+                            <tr class="table-success">
+                                <td>20-39</td>
+                                <td>Low</td>
+                            </tr>
+                            <tr class="table-light">
+                                <td>0-19</td>
+                                <td>Very Low</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="mt-3">
+                    <h6>Assessment Tips</h6>
+                    <ul class="small">
+                        <li>Consider both current controls and potential impact</li>
+                        <li>Use historical data when available</li>
+                        <li>Involve subject matter experts</li>
+                        <li>Document assumptions</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+<!-- templates/capa_list.html -->
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3>Corrective & Preventive Actions (CAPA)</h3>
+    <a href="{{ url_for('capa.new_capa') }}" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> New CAPA
+    </a>
+</div>
+
+<div class="row mb-3">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h4 class="text-primary">{{ capas|selectattr("status", "equalto", "open")|list|length }}</h4>
+                <small>Open</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h4 class="text-warning">{{ capas|selectattr("status", "equalto", "in_progress")|list|length }}</h4>
+                <small>In Progress</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h4 class="text-success">{{ capas|selectattr("status", "equalto", "completed")|list|length }}</h4>
+                <small>Completed</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h4 class="text-danger">0</h4>
+                <small>Overdue</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Title</th>
+                        <th>Type</th>
+                        <th>Assignee</th>
+                        <th>Due Date</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for capa in capas %}
+                    <tr>
+                        <td><code>{{ capa.id }}</code></td>
+                        <td>{{ capa.title }}</td>
+                        <td>
+                            <span class="badge bg-{{ 'success' if capa.type == 'preventive' else 'warning' }}">
+                                {{ capa.type|title }}
+                            </span>
+                        </td>
+                        <td>{{ capa.assignee }}</td>
+                        <td>{{ capa.due_date }}</td>
+                        <td>
+                            <span class="badge bg-{{ 'danger' if capa.priority == 'critical' else ('warning' if capa.priority == 'high' else 'secondary') }}">
+                                {{ capa.priority|title }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge bg-{{ 'success' if capa.status == 'completed' else ('warning' if capa.status == 'in_progress' else 'secondary') }}">
+                                {{ capa.status|replace('_', ' ')|title }}
+                            </span>
+                        </td>
+                        <td>
+                            <a href="{{ url_for('capa.capa_detail', capa_id=capa.id) }}" class="btn btn-sm btn-outline-primary">View</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+<!-- templates/safety_concern_new.html -->
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-4">Safety Concern Report (OSCR)</h3>
+
+<div class="alert alert-info">
+    <h6><i class="bi bi-shield-check"></i> Your Safety Matters</h6>
+    Thank you for speaking up! Every safety observation helps create a safer workplace for everyone.
+    All reports are taken seriously and handled confidentially.
+</div>
+
+<form method="post" class="card p-4">
+    <div class="row">
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label class="form-label">Report Type</label>
+                <select class="form-select" name="type" required>
+                    <option value="">Select type</option>
+                    <option value="concern">Safety Concern/Observation</option>
+                    <option value="recognition">Safety Recognition</option>
+                </select>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label class="form-label">Location</label>
+                <input type="text" class="form-control" name="location" placeholder="Building, area, or specific location">
+            </div>
+        </div>
+    </div>
+    
+    <div class="mb-3">
+        <label class="form-label">Title/Summary</label>
+        <input type="text" class="form-control" name="title" required placeholder="Brief description of the concern">
+    </div>
+    
+    <div class="mb-3">
+        <label class="form-label">Detailed Description</label>
+        <textarea class="form-control" name="description" rows="4" required 
+                  placeholder="Describe what you observed, including who, what, when, where, and how"></textarea>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label class="form-label">Hazard Type</label>
+                <select class="form-select" name="hazard_type">
+                    <option value="">Select hazard type</option>
+                    <option value="slip_trip_fall">Slip/Trip/Fall</option>
+                    <option value="chemical">Chemical Exposure</option>
+                    <option value="equipment">Equipment/Machinery</option>
+                    <option value="ergonomic">Ergonomic</option>
+                    <option value="electrical">Electrical</option>
+                    <option value="fire">Fire/Explosion</option>
+                    <option value="environmental">Environmental</option>
+                    <option value="security">Security</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label class="form-label">Immediate Action Taken</label>
+                <textarea class="form-control" name="immediate_action" rows="2" 
+                          placeholder="What immediate steps were taken to address the concern?"></textarea>
+            </div>
+        </div>
+    </div>
+    
+    <div class="mb-4">
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="anonymous" id="anonymous">
+            <label class="form-check-label" for="anonymous">
+                Submit anonymously
+            </label>
+            <div class="form-text">
+                If you submit anonymously, you won't receive updates on the resolution, 
+                but your concern will still be investigated.
+            </div>
+        </div>
+    </div>
+    
+    <div id="reporter-info">
+        <div class="mb-3">
+            <label class="form-label">Your Name (Optional)</label>
+            <input type="text" class="form-control" name="reporter"

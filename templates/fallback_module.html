@@ -1,0 +1,106 @@
+<!-- templates/fallback_module.html -->
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="text-center">
+                <div class="mb-4">
+                    <i class="bi bi-tools display-1 text-muted"></i>
+                </div>
+                <h3 class="mb-3">{{ module_name }} - Under Development</h3>
+                <p class="text-muted mb-4">{{ description }}</p>
+                
+                <div class="alert alert-info">
+                    <h6><i class="bi bi-info-circle"></i> Alternative Options</h6>
+                    <p class="mb-0">While this module is being set up, you can:</p>
+                </div>
+                
+                <div class="row mb-4">
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <i class="bi bi-robot fs-1 text-primary mb-3"></i>
+                                <h6>Use the AI Assistant</h6>
+                                <p class="small text-muted">Ask our chatbot for help with {{ module_name.lower() }}</p>
+                                <a href="/" class="btn btn-primary btn-sm">
+                                    <i class="bi bi-chat"></i> Chat Now
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <i class="bi bi-telephone fs-1 text-success mb-3"></i>
+                                <h6>Contact Support</h6>
+                                <p class="small text-muted">Reach out to the EHS team directly</p>
+                                <button class="btn btn-success btn-sm" onclick="showContactInfo()">
+                                    <i class="bi bi-person-lines-fill"></i> Contact Info
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="d-flex gap-2 justify-content-center">
+                    <a href="/dashboard" class="btn btn-outline-primary">
+                        <i class="bi bi-arrow-left"></i> Back to Dashboard
+                    </a>
+                    <a href="/incidents/new" class="btn btn-outline-danger">
+                        <i class="bi bi-exclamation-triangle"></i> Report Incident
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Contact Modal -->
+<div class="modal fade" id="contactModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">EHS Contact Information</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-6">
+                        <h6>Emergency</h6>
+                        <p>
+                            <strong>911</strong><br>
+                            <small class="text-muted">Life-threatening emergencies</small>
+                        </p>
+                        
+                        <h6>Site Emergency</h6>
+                        <p>
+                            <strong>(555) 123-4567</strong><br>
+                            <small class="text-muted">On-site emergencies</small>
+                        </p>
+                    </div>
+                    <div class="col-6">
+                        <h6>EHS Department</h6>
+                        <p>
+                            <strong>(555) 123-4569</strong><br>
+                            <small class="text-muted">General EHS inquiries</small>
+                        </p>
+                        
+                        <h6>Safety Hotline</h6>
+                        <p>
+                            <strong>(555) 123-4570</strong><br>
+                            <small class="text-muted">Anonymous reporting</small>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function showContactInfo() {
+    new bootstrap.Modal(document.getElementById('contactModal')).show();
+}
+</script>
+{% endblock %}

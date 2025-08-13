@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-3">Bulk Ingest Report</h3>
+<div class="card p-3">
+  <p><strong>Processed:</strong> {{ report.processed }}</p>
+  {% if report.ok and report.ok|length %}
+    <p><strong>OK (IDs):</strong> {{ report.ok|join(", ") }}</p>
+  {% endif %}
+  {% if report.skipped and report.skipped|length %}
+    <p><strong>Skipped (non-PDF):</strong> {{ report.skipped|join(", ") }}</p>
+  {% endif %}
+  {% if report.errors and report.errors|length %}
+    <div class="alert alert-warning">
+      <strong>Errors</strong>
+      <ul class="mb-0">
+        {% for e in report.errors %}
+          <li>{{ e }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+  <a class="btn btn-primary" href="{{ url_for('sds.sds_list') }}">Back to SDS Library</a>
+</div>
+{% endblock %}

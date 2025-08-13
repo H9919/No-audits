@@ -1,0 +1,263 @@
+<!-- templates/visitor_checkin.html - Visitor Check-in Form -->
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-4">
+    <i class="bi bi-person-check text-success"></i> Visitor Check-in
+</h3>
+
+<div class="alert alert-warning">
+    <h6><i class="bi bi-exclamation-triangle"></i> Safety First</h6>
+    All visitors must complete this check-in process and receive a safety briefing before entering work areas.
+</div>
+
+<form method="post" class="card shadow">
+    <div class="card-header bg-success text-white">
+        <h6 class="mb-0">Visitor Information</h6>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label class="form-label">Visitor Name <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" name="name" required 
+                           placeholder="Full name">
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label class="form-label">Company/Organization</label>
+                    <input type="text" class="form-control" name="company"
+                           placeholder="Visitor's company">
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label class="form-label">Purpose of Visit <span class="text-danger">*</span></label>
+                    <select class="form-select" name="purpose" required>
+                        <option value="">Select purpose</option>
+                        <option value="meeting">Business Meeting</option>
+                        <option value="delivery">Delivery/Pickup</option>
+                        <option value="maintenance">Maintenance/Service</option>
+                        <option value="inspection">Inspection/Audit</option>
+                        <option value="training">Training/Education</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label class="form-label">Host/Contact Person <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" name="host" required
+                           placeholder="Employee host name">
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label class="form-label">Expected Duration</label>
+                    <select class="form-select" name="duration">
+                        <option value="less_than_1_hour">Less than 1 hour</option>
+                        <option value="1_to_2_hours">1-2 hours</option>
+                        <option value="2_to_4_hours">2-4 hours</option>
+                        <option value="half_day">Half day</option>
+                        <option value="full_day">Full day</option>
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label class="form-label">Emergency Contact</label>
+                    <input type="text" class="form-control" name="emergency_contact"
+                           placeholder="Emergency contact name and phone">
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Areas Authorized to Visit</label>
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="areas" value="reception" id="reception" checked>
+                        <label class="form-check-label" for="reception">Reception/Lobby</label>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="areas" value="conference" id="conference">
+                        <label class="form-check-label" for="conference">Conference Rooms</label>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="areas" value="office" id="office_area">
+                        <label class="form-check-label" for="office_area">Office Areas</label>
+                    </div>
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-md-4">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="areas" value="warehouse" id="warehouse_area">
+                        <label class="form-check-label" for="warehouse_area">Warehouse</label>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="areas" value="production" id="production_area">
+                        <label class="form-check-label" for="production_area">Production Area</label>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="areas" value="lab" id="lab">
+                        <label class="form-check-label" for="lab">Laboratory</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="safety_briefing" id="safety_briefing" required>
+                <label class="form-check-label" for="safety_briefing">
+                    <span class="text-danger">*</span> I have received and understood the safety briefing
+                </label>
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="has_ppe" id="has_ppe">
+                <label class="form-check-label" for="has_ppe">
+                    I have been provided with required PPE (if applicable)
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-footer">
+        <div class="d-flex justify-content-between">
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Back
+            </a>
+            <button type="submit" class="btn btn-success">
+                <i class="bi bi-check-circle"></i> Complete Check-in
+            </button>
+        </div>
+    </div>
+</form>
+
+<!-- Safety Information Panel -->
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card border-warning">
+            <div class="card-header bg-warning text-dark">
+                <h6 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Emergency Information</h6>
+            </div>
+            <div class="card-body">
+                <p><strong>Emergency Contacts:</strong></p>
+                <ul class="list-unstyled">
+                    <li><i class="bi bi-telephone"></i> Emergency: 911</li>
+                    <li><i class="bi bi-telephone"></i> Site Emergency: (555) 123-4567</li>
+                    <li><i class="bi bi-telephone"></i> Security: (555) 123-4568</li>
+                </ul>
+                
+                <p><strong>Assembly Points:</strong></p>
+                <ul class="list-unstyled">
+                    <li><i class="bi bi-geo-alt"></i> Primary: North Parking Lot</li>
+                    <li><i class="bi bi-geo-alt"></i> Secondary: South Gate</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card border-info">
+            <div class="card-header bg-info text-white">
+                <h6 class="mb-0"><i class="bi bi-shield-check"></i> Safety Guidelines</h6>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled">
+                    <li><i class="bi bi-check"></i> Follow your designated escort at all times</li>
+                    <li><i class="bi bi-check"></i> Stay within authorized areas only</li>
+                    <li><i class="bi bi-check"></i> Wear required PPE in designated areas</li>
+                    <li><i class="bi bi-check"></i> Report any unsafe conditions immediately</li>
+                    <li><i class="bi bi-check"></i> No photography without permission</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Show warning for high-risk areas
+document.addEventListener('DOMContentLoaded', function() {
+    const highRiskAreas = ['warehouse', 'production', 'lab'];
+    const checkboxes = document.querySelectorAll('input[name="areas"]');
+    
+    checkboxes.forEach(checkbox => {
+        if (highRiskAreas.includes(checkbox.value)) {
+            checkbox.addEventListener('change', function() {
+                if (this.checked) {
+                    showAreaWarning(this.nextElementSibling.textContent);
+                }
+            });
+        }
+    });
+    
+    // Safety briefing requirement
+    const safetyBriefing = document.getElementById('safety_briefing');
+    const submitButton = document.querySelector('button[type="submit"]');
+    
+    function updateSubmitButton() {
+        submitButton.disabled = !safetyBriefing.checked;
+    }
+    
+    safetyBriefing.addEventListener('change', updateSubmitButton);
+    updateSubmitButton(); // Initial state
+});
+
+function showAreaWarning(areaName) {
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.innerHTML = `
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-warning">
+                    <h5 class="modal-title"><i class="bi bi-exclamation-triangle"></i> High-Risk Area Warning</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>${areaName}</strong> requires additional safety precautions:</p>
+                    <ul>
+                        <li>Personal Protective Equipment (PPE) may be required</li>
+                        <li>You must be escorted at all times</li>
+                        <li>Follow all posted safety signs and instructions</li>
+                        <li>Your host will provide specific safety instructions</li>
+                    </ul>
+                    <p class="text-warning"><strong>Do not enter this area without proper authorization and safety briefing.</strong></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-warning" data-bs-dismiss="modal">I Understand</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    const bootstrapModal = new bootstrap.Modal(modal);
+    bootstrapModal.show();
+    
+    // Remove modal from DOM when closed
+    modal.addEventListener('hidden.bs.modal', function() {
+        document.body.removeChild(modal);
+    });
+}
+</script>
+{% endblock %}

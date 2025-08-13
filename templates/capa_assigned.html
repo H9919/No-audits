@@ -1,0 +1,285 @@
+<!-- templates/capa_assigned.html - My Assigned CAPAs -->
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h3><i class="bi bi-person-gear text-primary"></i> My Assigned CAPAs</h3>
+        <p class="text-muted">{{ user }}</p>
+    </div>
+    <div>
+        <a href="{{ url_for('capa.capa_list') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-list"></i> All CAPAs
+        </a>
+        <a href="{{ url_for('capa.capa_dashboard') }}" class="btn btn-outline-info">
+            <i class="bi bi-graph-up"></i> Dashboard
+        </a>
+    </div>
+</div>
+
+<!-- Priority Alert for Overdue Items -->
+{% set overdue_capas = capas|selectattr("due_date")|select("test", moment().format('YYYY-MM-DD'), ">")|list %}
+{% if overdue_capas %}
+<div class="alert alert-danger">
+    <h6><i class="bi bi-exclamation-triangle"></i> Overdue Items Need Immediate Attention</h6>
+    <p class="mb-0">You have {{ overdue_capas|length }} overdue CAPA(s). Please review and update these items as soon as possible.</p>
+</div>
+{% endif %}
+
+<!-- Quick Actions -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card bg-warning text-white">
+            <div class="card-body text-center">
+                <h3>{{ capas|selectattr("status", "equalto", "open")|list|length }}</h3>
+                <p class="mb-0">Open</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center">
+                <h3>{{ capas|selectattr("status", "equalto", "in_progress")|list|length }}</h3>
+                <p class="mb-0">In Progress</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-danger text-white">
+            <div class="card-body text-center">
+                <h3>{{ overdue_capas|length }}</h3>
+                <p class="mb-0">Overdue</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- CAPAs Table -->
+<div class="card shadow">
+    <div class="card-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <h6 class="mb-0">Your CAPAs ({{ capas|length }})</h6>
+            <div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-secondary" onclick="filterStatus('all')">All</button>
+                <button class="btn btn-outline-warning" onclick="filterStatus('open')">Open</button>
+                <button class="btn btn-outline-info" onclick="filterStatus('in_progress')">In Progress</button>
+                <button class="btn btn-outline-danger" onclick="filterStatus('overdue')">Overdue</button>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        {% if capas %}
+        <div class="table-responsive">
+            <table class="table table-hover" id="capaTable">
+                <thead>
+                    <tr>
+                        <th>Priority</th>
+                        <th>Title</th>
+                        <th>Type</th>
+                        <th>Due Date</th>
+                        <th>Status</th>
+                        <th>Source</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for capa in capas %}
+                    <tr data-status="{{ capa.status }}" data-priority="{{ capa.priority }}" 
+                        data-overdue="{{ 'true' if capa.due_date and capa.due_date < moment().format('YYYY-MM-DD') else 'false' }}">
+                        <td>
+                            <span class="badge bg-{{ 'danger' if capa.priority == 'critical' else ('warning' if capa.priority == 'high' else ('info' if capa.priority == 'medium' else 'secondary')) }}">
+                                {{ capa.priority|title }}
+                            </span>
+                        </td>
+                        <td>
+                            <strong>{{ capa.title }}</strong>
+                            {% if capa.description %}
+                            <br><small class="text-muted">{{ capa.description[:80] }}{% if capa.description|length > 80 %}...{% endif %}</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge bg-{{ 'success' if capa.type == 'preventive' else 'warning' }}">
+                                {{ capa.type|title }}
+                            </span>
+                        </td>
+                        <td>
+                            {{ capa.due_date }}
+                            {% if capa.due_date and capa.due_date < moment().format('YYYY-MM-DD') and capa.status in ['open', 'in_progress'] %}
+                                <br><small class="text-danger"><i class="bi bi-exclamation-triangle"></i> Overdue</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge bg-{{ 'success' if capa.status == 'completed' else ('warning' if capa.status == 'in_progress' else 'secondary') }}">
+                                {{ capa.status|replace('_', ' ')|title }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if capa.source != 'manual' %}
+                                <span class="badge bg-info">{{ capa.source|title }}</span>
+                                {% if capa.source_id %}
+                                    <br><small class="text-muted">{{ capa.source_id[:8] }}</small>
+                                {% endif %}
+                            {% else %}
+                                <span class="text-muted">Manual</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('capa.capa_detail', capa_id=capa.id) }}" class="btn btn-outline-primary" title="View Details">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                {% if capa.status == 'open' %}
+                                <button class="btn btn-outline-warning" onclick="quickUpdate('{{ capa.id }}', 'in_progress')" title="Start Work">
+                                    <i class="bi bi-play"></i>
+                                </button>
+                                {% endif %}
+                                {% if capa.status in ['open', 'in_progress'] %}
+                                <button class="btn btn-outline-success" onclick="quickUpdate('{{ capa.id }}', 'completed')" title="Mark Complete">
+                                    <i class="bi bi-check"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-person-check fs-1 text-muted"></i>
+            <h5 class="text-muted mt-3">No CAPAs Assigned</h5>
+            <p class="text-muted">You don't have any CAPAs assigned to you at the moment.</p>
+            <a href="{{ url_for('capa.capa_list') }}" class="btn btn-primary">
+                <i class="bi bi-list"></i> View All CAPAs
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Quick Update Modal -->
+<div class="modal fade" id="quickUpdateModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Update CAPA Status</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="quickUpdateForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Comment</label>
+                        <textarea class="form-control" name="comment" rows="3" placeholder="Add a comment about this update"></textarea>
+                    </div>
+                    <input type="hidden" name="capa_id" id="updateCapaId">
+                    <input type="hidden" name="status" id="updateStatus">
+                    <input type="hidden" name="updated_by" value="{{ user }}">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Update CAPA</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function filterStatus(status) {
+    const table = document.getElementById('capaTable');
+    const rows = table.querySelectorAll('tbody tr');
+    
+    rows.forEach(row => {
+        const rowStatus = row.dataset.status;
+        const isOverdue = row.dataset.overdue === 'true';
+        
+        let show = false;
+        
+        switch(status) {
+            case 'all':
+                show = true;
+                break;
+            case 'overdue':
+                show = isOverdue && rowStatus !== 'completed';
+                break;
+            default:
+                show = rowStatus === status;
+        }
+        
+        row.style.display = show ? '' : 'none';
+    });
+    
+    // Update active button
+    document.querySelectorAll('.btn-group .btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    event.target.classList.add('active');
+}
+
+function quickUpdate(capaId, status) {
+    document.getElementById('updateCapaId').value = capaId;
+    document.getElementById('updateStatus').value = status;
+    
+    const modal = new bootstrap.Modal(document.getElementById('quickUpdateModal'));
+    modal.show();
+}
+
+// Handle quick update form submission
+document.getElementById('quickUpdateForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const capaId = formData.get('capa_id');
+    
+    fetch(`/capa/${capaId}/update`, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        if (response.ok) {
+            location.reload();
+        } else {
+            alert('Error updating CAPA');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error updating CAPA');
+    });
+});
+
+// Auto-highlight overdue items
+document.addEventListener('DOMContentLoaded', function() {
+    const overdueRows = document.querySelectorAll('tr[data-overdue="true"]');
+    overdueRows.forEach(row => {
+        if (row.dataset.status !== 'completed') {
+            row.classList.add('table-warning');
+        }
+    });
+});
+
+// Keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+    if (e.ctrlKey || e.metaKey) {
+        switch(e.key) {
+            case '1':
+                e.preventDefault();
+                filterStatus('all');
+                break;
+            case '2':
+                e.preventDefault();
+                filterStatus('open');
+                break;
+            case '3':
+                e.preventDefault();
+                filterStatus('in_progress');
+                break;
+            case '4':
+                e.preventDefault();
+                filterStatus('overdue');
+                break;
+        }
+    }
+});
+</script>
+{% endblock %}

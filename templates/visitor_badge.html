@@ -1,0 +1,275 @@
+<!-- templates/visitor_badge.html - Visitor Badge Generation -->
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="text-center mb-4">
+                <h3><i class="bi bi-person-badge text-success"></i> Visitor Check-in Complete</h3>
+                <p class="text-success">Welcome to our facility, {{ visitor.name }}!</p>
+            </div>
+
+            <!-- Visitor Badge -->
+            <div class="card shadow-lg mx-auto" style="max-width: 400px;" id="visitorBadge">
+                <div class="card-header bg-primary text-white text-center">
+                    <h5 class="mb-0">VISITOR</h5>
+                    <small>{{ moment().format('YYYY-MM-DD') }}</small>
+                </div>
+                <div class="card-body text-center">
+                    <!-- Visitor Photo Placeholder -->
+                    <div class="visitor-photo mx-auto mb-3">
+                        <i class="bi bi-person-circle" style="font-size: 5rem; color: #6c757d;"></i>
+                    </div>
+                    
+                    <h4 class="mb-1">{{ visitor.name }}</h4>
+                    {% if visitor.company %}
+                    <p class="text-muted mb-2">{{ visitor.company }}</p>
+                    {% endif %}
+                    
+                    <div class="badge bg-info mb-3">{{ visitor.purpose|replace('_', ' ')|title }}</div>
+                    
+                    <div class="row text-start">
+                        <div class="col-6">
+                            <small class="text-muted">Check-in:</small>
+                            <br><strong>{{ moment(visitor.checkin_time).format('HH:mm') }}</strong>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted">Duration:</small>
+                            <br><strong>{{ visitor.expected_duration|replace('_', ' ')|title }}</strong>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="text-start">
+                        <small class="text-muted">Host:</small>
+                        <br><strong>{{ visitor.host }}</strong>
+                    </div>
+                    
+                    {% if visitor.areas_authorized %}
+                    <div class="text-start mt-2">
+                        <small class="text-muted">Authorized Areas:</small>
+                        <br>
+                        {% for area in visitor.areas_authorized %}
+                        <span class="badge bg-secondary me-1">{{ area|replace('_', ' ')|title }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="card-footer bg-light text-center">
+                    <div class="row">
+                        <div class="col-6">
+                            {% if visitor.safety_briefing_completed %}
+                            <i class="bi bi-check-circle text-success"></i>
+                            <small class="text-success">Safety Briefed</small>
+                            {% else %}
+                            <i class="bi bi-x-circle text-danger"></i>
+                            <small class="text-danger">No Safety Briefing</small>
+                            {% endif %}
+                        </div>
+                        <div class="col-6">
+                            {% if visitor.has_ppe %}
+                            <i class="bi bi-shield-check text-success"></i>
+                            <small class="text-success">PPE Provided</small>
+                            {% else %}
+                            <i class="bi bi-shield text-muted"></i>
+                            <small class="text-muted">No PPE Required</small>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <small class="text-muted">ID: {{ visitor.id[:8] }}</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="text-center mt-4">
+                <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                    <button class="btn btn-primary" onclick="printBadge()">
+                        <i class="bi bi-printer"></i> Print Badge
+                    </button>
+                    <button class="btn btn-outline-secondary" onclick="emailBadge()">
+                        <i class="bi bi-envelope"></i> Email Badge
+                    </button>
+                    <a href="{{ url_for('index') }}" class="btn btn-outline-success">
+                        <i class="bi bi-person-plus"></i> Check-in Another Visitor
+                    </a>
+                </div>
+            </div>
+
+            <!-- Important Reminders -->
+            <div class="row mt-4">
+                <div class="col-md-6">
+                    <div class="card border-warning">
+                        <div class="card-header bg-warning text-dark">
+                            <h6 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Important Reminders</h6>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-unstyled mb-0">
+                                <li><i class="bi bi-check text-success"></i> Wear this badge visibly at all times</li>
+                                <li><i class="bi bi-check text-success"></i> Stay with your host/escort</li>
+                                <li><i class="bi bi-check text-success"></i> Follow all safety instructions</li>
+                                <li><i class="bi bi-check text-success"></i> Report incidents immediately</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="card border-info">
+                        <div class="card-header bg-info text-white">
+                            <h6 class="mb-0"><i class="bi bi-clock"></i> Check-out Process</h6>
+                        </div>
+                        <div class="card-body">
+                            <p class="mb-2"><strong>Before leaving:</strong></p>
+                            <ul class="list-unstyled mb-0">
+                                <li><i class="bi bi-arrow-right text-info"></i> Return this badge to reception</li>
+                                <li><i class="bi bi-arrow-right text-info"></i> Sign out with security</li>
+                                <li><i class="bi bi-arrow-right text-info"></i> Return any borrowed PPE</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Emergency Contacts (Compact) -->
+            <div class="card mt-4 border-danger">
+                <div class="card-header bg-danger text-white text-center">
+                    <h6 class="mb-0"><i class="bi bi-telephone"></i> Emergency Contacts</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <strong>911</strong>
+                            <br><small>Life Emergency</small>
+                        </div>
+                        <div class="col-4">
+                            <strong>(555) 123-4567</strong>
+                            <br><small>Site Emergency</small>
+                        </div>
+                        <div class="col-4">
+                            <strong>(555) 123-4568</strong>
+                            <br><small>Security</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+@media print {
+    .btn, .card:not(#visitorBadge), nav, .alert {
+        display: none !important;
+    }
+    
+    #visitorBadge {
+        box-shadow: none !important;
+        border: 2px solid #000 !important;
+        page-break-inside: avoid;
+    }
+    
+    body {
+        margin: 0;
+        padding: 20px;
+    }
+    
+    .container {
+        max-width: none !important;
+        width: 100% !important;
+    }
+}
+
+.visitor-photo {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    border: 3px solid #dee2e6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f8f9fa;
+}
+</style>
+
+<script>
+function printBadge() {
+    // Hide all elements except the badge for printing
+    const badge = document.getElementById('visitorBadge');
+    const originalContents = document.body.innerHTML;
+    
+    // Create print content
+    const printContents = `
+        <div style="text-align: center; padding: 20px;">
+            <h2>Visitor Badge</h2>
+            ${badge.outerHTML}
+            <div style="margin-top: 20px; page-break-before: always;">
+                <h3>Emergency Information</h3>
+                <p><strong>Emergency:</strong> 911</p>
+                <p><strong>Site Emergency:</strong> (555) 123-4567</p>
+                <p><strong>Security:</strong> (555) 123-4568</p>
+                <p><strong>Assembly Point:</strong> North Parking Lot</p>
+            </div>
+        </div>
+    `;
+    
+    // Open print dialog
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+        <html>
+        <head>
+            <title>Visitor Badge - {{ visitor.name }}</title>
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+            <style>
+                body { font-family: Arial, sans-serif; }
+                .card { border: 2px solid #000; margin: 20px auto; max-width: 400px; }
+                .visitor-photo { width: 100px; height: 100px; border-radius: 50%; margin: 0 auto; border: 3px solid #dee2e6; display: flex; align-items: center; justify-content: center; background: #f8f9fa; }
+            </style>
+        </head>
+        <body>${printContents}</body>
+        </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+    printWindow.close();
+}
+
+function emailBadge() {
+    // In a real implementation, this would send an email with the badge
+    const recipient = prompt('Enter email address to send badge to:');
+    if (recipient) {
+        alert(`Badge would be emailed to: ${recipient}\n\nIn a full implementation, this would generate a PDF badge and email it to the visitor.`);
+    }
+}
+
+// Auto-refresh check-in time
+setInterval(function() {
+    const timeElement = document.querySelector('strong');
+    if (timeElement && timeElement.textContent.includes(':')) {
+        // Update the time if needed (for long page views)
+        const now = new Date();
+        const timeString = now.toLocaleTimeString('en-US', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            hour12: false 
+        });
+        // This would update if the page stays open for a long time
+    }
+}, 60000); // Update every minute
+
+// Add some visual feedback when the page loads
+document.addEventListener('DOMContentLoaded', function() {
+    const badge = document.getElementById('visitorBadge');
+    badge.style.transform = 'scale(0.8)';
+    badge.style.opacity = '0';
+    
+    setTimeout(() => {
+        badge.style.transition = 'all 0.5s ease-out';
+        badge.style.transform = 'scale(1)';
+        badge.style.opacity = '1';
+    }, 100);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,175 @@
+<!-- templates/safety_concern_detail.html -->
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h3><i class="bi bi-shield-exclamation text-warning"></i> Safety Concern Details</h3>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('safety_concerns.concerns_list') }}">Safety Concerns</a></li>
+                <li class="breadcrumb-item active">{{ concern.id[:8] }}</li>
+            </ol>
+        </nav>
+    </div>
+    <div>
+        <span class="badge bg-{{ 'success' if concern.status == 'resolved' else ('warning' if concern.status == 'investigating' else 'secondary') }} fs-6">
+            {{ concern.status|replace('_', ' ')|title }}
+        </span>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <!-- Concern Information -->
+        <div class="card shadow mb-4">
+            <div class="card-header bg-warning text-white">
+                <h6 class="mb-0"><i class="bi bi-info-circle"></i> Safety Concern Information</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>ID:</strong> <code>{{ concern.id }}</code></p>
+                        <p><strong>Title:</strong> {{ concern.title }}</p>
+                        <p><strong>Type:</strong> 
+                            <span class="badge bg-{{ 'info' if concern.type == 'concern' else 'success' }}">
+                                {{ concern.type|title }}
+                            </span>
+                        </p>
+                        <p><strong>Priority:</strong> 
+                            <span class="badge bg-{{ 'danger' if concern.priority == 'high' else ('warning' if concern.priority == 'medium' else 'secondary') }}">
+                                {{ concern.priority|title }}
+                            </span>
+                        </p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Location:</strong> {{ concern.location or 'Not specified' }}</p>
+                        <p><strong>Hazard Type:</strong> {{ concern.hazard_type or 'General' }}</p>
+                        <p><strong>Reporter:</strong> 
+                            {% if concern.anonymous %}
+                                <span class="text-muted">Anonymous</span>
+                            {% else %}
+                                {{ concern.reporter or 'Unknown' }}
+                            {% endif %}
+                        </p>
+                        <p><strong>Reported:</strong> {{ moment(concern.created_date).format('YYYY-MM-DD HH:mm') }}</p>
+                    </div>
+                </div>
+                
+                <hr>
+                <h6>Description</h6>
+                <p>{{ concern.description }}</p>
+                
+                {% if concern.immediate_action %}
+                <hr>
+                <h6>Immediate Action Taken</h6>
+                <p>{{ concern.immediate_action }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Update History -->
+        {% if concern.updates %}
+        <div class="card shadow mb-4">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-clock-history"></i> Update History</h6>
+            </div>
+            <div class="card-body">
+                {% for update in concern.updates|reverse %}
+                <div class="border-bottom pb-3 mb-3">
+                    <div class="d-flex justify-content-between">
+                        <strong>
+                            {% if update.status_change %}
+                                Status changed from "{{ update.old_status|replace('_', ' ')|title }}" to "{{ update.new_status|replace('_', ' ')|title }}"
+                            {% else %}
+                                Safety Concern Updated
+                            {% endif %}
+                        </strong>
+                        <small class="text-muted">{{ moment(update.timestamp).fromNow() }}</small>
+                    </div>
+                    {% if update.comment %}
+                    <p class="mt-2 mb-1">{{ update.comment }}</p>
+                    {% endif %}
+                    <small class="text-muted">By: {{ update.user }}</small>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="col-md-4">
+        <!-- Quick Actions -->
+        <div class="card shadow mb-4">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-lightning"></i> Quick Actions</h6>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    {% if concern.status != 'resolved' %}
+                    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#updateModal">
+                        <i class="bi bi-pencil"></i> Update Status
+                    </button>
+                    {% endif %}
+                    
+                    <a href="{{ url_for('capa.new_capa', source='safety_concern', source_id=concern.id) }}" class="btn btn-outline-primary">
+                        <i class="bi bi-arrow-repeat"></i> Create CAPA
+                    </a>
+                    
+                    <a href="{{ url_for('safety_concerns.concerns_list') }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left"></i> Back to List
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Update Modal -->
+<div class="modal fade" id="updateModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Update Safety Concern</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{{ url_for('safety_concerns.update_concern', concern_id=concern.id) }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Status</label>
+                        <select class="form-select" name="status">
+                            <option value="reported" {{ 'selected' if concern.status == 'reported' }}>Reported</option>
+                            <option value="investigating" {{ 'selected' if concern.status == 'investigating' }}>Investigating</option>
+                            <option value="resolved" {{ 'selected' if concern.status == 'resolved' }}>Resolved</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Assigned To</label>
+                        <input type="text" class="form-control" name="assigned_to" value="{{ concern.assigned_to }}">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Priority</label>
+                        <select class="form-select" name="priority">
+                            <option value="low" {{ 'selected' if concern.priority == 'low' }}>Low</option>
+                            <option value="medium" {{ 'selected' if concern.priority == 'medium' }}>Medium</option>
+                            <option value="high" {{ 'selected' if concern.priority == 'high' }}>High</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Comment <span class="text-danger">*</span></label>
+                        <textarea class="form-control" name="comment" rows="3" placeholder="Describe the update or actions taken" required></textarea>
+                    </div>
+                    
+                    <input type="hidden" name="updated_by" value="Current User">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Update</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

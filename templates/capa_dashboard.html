@@ -1,0 +1,273 @@
+<!-- templates/capa_dashboard.html - CAPA Analytics Dashboard -->
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-4">
+    <i class="bi bi-graph-up text-primary"></i> CAPA Dashboard
+</h3>
+
+<!-- Summary Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-center bg-primary text-white">
+            <div class="card-body">
+                <h3>{{ stats.total }}</h3>
+                <p class="mb-0">Total CAPAs</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center bg-warning text-white">
+            <div class="card-body">
+                <h3>{{ stats.open + stats.in_progress }}</h3>
+                <p class="mb-0">Active CAPAs</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center bg-danger text-white">
+            <div class="card-body">
+                <h3>{{ stats.overdue }}</h3>
+                <p class="mb-0">Overdue CAPAs</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center bg-success text-white">
+            <div class="card-body">
+                <h3>{{ ((stats.completed / stats.total) * 100)|round|int if stats.total > 0 else 0 }}%</h3>
+                <p class="mb-0">Completion Rate</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card shadow">
+            <div class="card-header">
+                <h6><i class="bi bi-pie-chart"></i> CAPAs by Priority</h6>
+            </div>
+            <div class="card-body">
+                <canvas id="priorityChart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card shadow">
+            <div class="card-header">
+                <h6><i class="bi bi-bar-chart"></i> CAPAs by Type</h6>
+            </div>
+            <div class="card-body">
+                <canvas id="typeChart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Overdue CAPAs -->
+{% if overdue %}
+<div class="card shadow mb-4">
+    <div class="card-header bg-danger text-white">
+        <h6 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Overdue CAPAs ({{ overdue|length }})</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Title</th>
+                        <th>Assignee</th>
+                        <th>Due Date</th>
+                        <th>Days Overdue</th>
+                        <th>Priority</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for capa in overdue %}
+                    <tr>
+                        <td><code>{{ capa.id[:8] }}</code></td>
+                        <td>{{ capa.title }}</td>
+                        <td>{{ capa.assignee }}</td>
+                        <td>{{ capa.due_date }}</td>
+                        <td><span class="badge bg-danger">{{ capa.days_overdue }} days</span></td>
+                        <td>
+                            <span class="badge bg-{{ 'danger' if capa.priority == 'critical' else ('warning' if capa.priority == 'high' else 'info') }}">
+                                {{ capa.priority|title }}
+                            </span>
+                        </td>
+                        <td>
+                            <a href="{{ url_for('capa.capa_detail', capa_id=capa.id) }}" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-eye"></i> View
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Recent Activity -->
+<div class="row">
+    <div class="col-md-6">
+        <div class="card shadow">
+            <div class="card-header">
+                <h6><i class="bi bi-clock"></i> Recent CAPA Activity</h6>
+            </div>
+            <div class="card-body">
+                <div id="recentActivity">
+                    <div class="text-center py-3">
+                        <div class="spinner-border spinner-border-sm"></div>
+                        <p class="small text-muted mt-2">Loading recent activity...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card shadow">
+            <div class="card-header">
+                <h6><i class="bi bi-graph-up"></i> Performance Metrics</h6>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6 border-end">
+                        <h4 class="text-info">{{ (stats.completed / (stats.completed + stats.overdue))|round(2) * 100 if (stats.completed + stats.overdue) > 0 else 0 }}%</h4>
+                        <small class="text-muted">On-Time Completion</small>
+                    </div>
+                    <div class="col-6">
+                        <h4 class="text-success">{{ stats.by_source.get('audit', 0) + stats.by_source.get('incident', 0) + stats.by_source.get('risk', 0) }}</h4>
+                        <small class="text-muted">System Generated</small>
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <div class="mb-3">
+                    <label class="form-label">Source Distribution</label>
+                    {% for source, count in stats.by_source.items() %}
+                    <div class="d-flex justify-content-between">
+                        <span>{{ source|title }}:</span>
+                        <span class="fw-bold">{{ count }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Priority Distribution Chart
+    const priorityCtx = document.getElementById('priorityChart').getContext('2d');
+    new Chart(priorityCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Critical', 'High', 'Medium', 'Low'],
+            datasets: [{
+                data: [
+                    {{ stats.by_priority.critical }},
+                    {{ stats.by_priority.high }},
+                    {{ stats.by_priority.medium }},
+                    {{ stats.by_priority.low }}
+                ],
+                backgroundColor: ['#dc3545', '#fd7e14', '#0dcaf0', '#6c757d']
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+
+    // Type Distribution Chart
+    const typeCtx = document.getElementById('typeChart').getContext('2d');
+    new Chart(typeCtx, {
+        type: 'bar',
+        data: {
+            labels: ['Corrective', 'Preventive'],
+            datasets: [{
+                label: 'Number of CAPAs',
+                data: [
+                    {{ stats.by_type.corrective }},
+                    {{ stats.by_type.preventive }}
+                ],
+                backgroundColor: ['#ffc107', '#198754']
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+
+    // Load recent activity
+    loadRecentActivity();
+});
+
+function loadRecentActivity() {
+    // This would fetch recent CAPA updates in a real implementation
+    const recentActivity = document.getElementById('recentActivity');
+    
+    // Simulate recent activity data
+    const activities = [
+        {
+            action: "CAPA Created",
+            title: "Address audit finding: Emergency exit signage",
+            user: "Safety Manager",
+            time: "2 hours ago"
+        },
+        {
+            action: "CAPA Completed",
+            title: "Update chemical storage procedures",
+            user: "Operations Lead",
+            time: "1 day ago"
+        },
+        {
+            action: "CAPA Updated",
+            title: "Install additional fire extinguishers",
+            user: "Maintenance Team",
+            time: "2 days ago"
+        }
+    ];
+    
+    recentActivity.innerHTML = activities.map(activity => `
+        <div class="activity-item mb-3 p-2 bg-light rounded">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <strong>${activity.action}:</strong> ${activity.title}
+                    <br><small class="text-muted">By ${activity.user}</small>
+                </div>
+                <small class="text-muted">${activity.time}</small>
+            </div>
+        </div>
+    `).join('');
+}
+</script>
+{% endblock %}

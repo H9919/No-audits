@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-3">Edit Incident <code>{{ rec.id }}</code></h3>
+<div class="mb-2">
+  <span class="badge bg-info">Completeness: {{ completeness }}%</span>
+  {% if ok %}
+    <span class="badge bg-success">Valid ✔</span>
+  {% else %}
+    <span class="badge bg-warning text-dark">Missing: {{ ", ".join(missing) }}</span>
+  {% endif %}
+</div>
+<form method="post" class="card p-3">
+  <div class="mb-3">
+    <label class="form-label">Incident Type</label>
+    <select class="form-select" name="type">
+      {% for t in required_by_type.keys() %}
+      <option value="{{ t }}" {% if rec.type==t %}selected{% endif %}>{{ t }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  {% for c in ["people","environment","cost","legal","reputation"] %}
+  <div class="mb-3">
+    <label class="form-label">{{ c|capitalize }}</label>
+    <textarea class="form-control" name="{{ c }}" rows="3">{{ rec.answers[c] }}</textarea>
+  </div>
+  {% endfor %}
+  
+  <div class="mb-3 form-check">
+    <input class="form-check-input" type="checkbox" name="anonymous" id="anon" {% if rec.anonymous %}checked{% endif %}>
+    <label class="form-check-label" for="anon">Anonymous Reporter</label>
+  </div>
+  <div class="row">
+    <div class="col-md-4 mb-3">
+      <label class="form-label">Facility / Site Code</label>
+      <input class="form-control" type="text" name="facility_code" value="{{ rec.facility_code }}">
+    </div>
+    <div class="col-md-4 mb-3">
+      <label class="form-label">Region</label>
+      <input class="form-control" type="text" name="region" value="{{ rec.region }}">
+    </div>
+  </div>
+  <div class="row">
+    <div class="col-md-4 mb-3">
+      <label class="form-label">Location Latitude</label>
+      <input class="form-control" type="text" name="location_lat" value="{{ rec.location_lat }}">
+    </div>
+    <div class="col-md-4 mb-3">
+      <label class="form-label">Location Longitude</label>
+      <input class="form-control" type="text" name="location_lng" value="{{ rec.location_lng }}">
+    </div>
+    <div class="col-md-4 mb-3">
+      <label class="form-label">Location (text)</label>
+      <input class="form-control" type="text" name="location_text" value="{{ rec.location_text }}">
+    </div>
+  </div>
+
+  <button class="btn btn-primary">Save & Validate</button>
+
+    <!-- Reporter Details -->
+    <div class="card mt-3">
+      <div class="card-body">
+        <h5 class="card-title">Reporter Details</h5>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Reporter Name</label>
+            <input type="text" class="form-control" name="reporter" id="reporter_name"
+                   value="{{ record.get('reporter','') }}" placeholder="Full name">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Reporter Contact (email or phone)</label>
+            <input type="text" class="form-control" name="reporter_contact" id="reporter_contact"
+                   value="{{ record.get('reporter_contact','') }}" placeholder="email@company.com / +1-555-1234">
+          </div>
+        </div>
+        <div class="form-text mt-2">If "Anonymous" is enabled, these details will be removed on save.</div>
+      </div>
+    </div>
+
+    <script>
+      (function() {
+        function syncAnon() {
+          var anon = document.querySelector('input[name="anonymous"]');
+          var name = document.getElementById('reporter_name');
+          var contact = document.getElementById('reporter_contact');
+          if (!anon || !name || !contact) return;
+          var hide = !!anon.checked;
+          name.disabled = hide; contact.disabled = hide;
+          if (hide) { name.value = ""; contact.value = ""; }
+          var card = name.closest('.card');
+          if (card) { card.style.opacity = hide ? '0.5' : '1'; }
+        }
+        document.addEventListener('change', function(e){
+          if (e.target && e.target.name === 'anonymous') syncAnon();
+        });
+        window.addEventListener('DOMContentLoaded', syncAnon);
+      })();
+    </script>
+    
+</form>
+  {% if rec.capa %}
+  <hr/>
+  <h5>CAPA Status</h5>
+  <form method="post" action="{{ url_for('incidents.incident_capa_status', iid=rec.id) }}">
+    <div class="row">
+      <div class="col-md-3 mb-2">
+        <label class="form-label">Status</label>
+        <select class="form-select" name="status">
+          {% set st = rec.capa.status or 'open' %}
+          <option value="open" {% if st=='open' %}selected{% endif %}>Open</option>
+          <option value="in_progress" {% if st=='in_progress' %}selected{% endif %}>In Progress</option>
+          <option value="completed" {% if st=='completed' %}selected{% endif %}>Completed</option>
+        </select>
+      </div>
+      <div class="col-md-3 mb-2">
+        <label class="form-label">Assignee</label>
+        <input class="form-control" type="text" name="assignee" value="{{ rec.capa.assignee or '' }}">
+      </div>
+      <div class="col-md-3 mb-2">
+        <label class="form-label">Due Date</label>
+        <input class="form-control" type="date" name="due_date" value="{{ rec.capa.due_date or '' }}">
+      </div>
+      <div class="col-md-3 mb-2">
+        <label class="form-label">Priority</label>
+        <select class="form-select" name="priority">
+          {% set pr = (rec.capa.priority or 'medium') | lower %}
+          <option value="low" {% if pr=='low' %}selected{% endif %}>Low</option>
+          <option value="medium" {% if pr=='medium' %}selected{% endif %}>Medium</option>
+          <option value="high" {% if pr=='high' %}selected{% endif %}>High</option>
+          <option value="critical" {% if pr=='critical' %}selected{% endif %}>Critical</option>
+        </select>
+      </div>
+    </div>
+    <div class="mb-2">
+      <label class="form-label">Comment</label>
+      <input class="form-control" type="text" name="comment" placeholder="Note for this status change">
+    </div>
+    <div class="mb-2">
+      <label class="form-label">Updated By</label>
+      <input class="form-control" type="text" name="updated_by" placeholder="Your name/role">
+    </div>
+    <button class="btn btn-outline-primary">Update CAPA Status</button>
+
+  {% if capa_detail %}
+  <hr/>
+  <h5>CAPA History</h5>
+  <div class="list-group">
+    {% for u in (capa_detail.updates or [])|reverse %}
+    <div class="list-group-item">
+      <div class="d-flex justify-content-between">
+        <div>
+          <div class="small text-muted">{{ u.timestamp }}</div>
+          <div>{{ u.comment or "" }}</div>
+        </div>
+        <div class="text-end">
+          {% if u.status_change %}
+            <div class="badge bg-info">Status: {{ u.old_status }} → {{ u.new_status }}</div>
+          {% endif %}
+          {% if u.fields_changed %}
+            <div class="small text-muted">
+              {% for f in u.fields_changed %}
+                <div>{{ f.field }}: {{ f.old_value or "—" }} → {{ f.new_value or "—" }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <div class="list-group-item text-muted">No CAPA updates yet.</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  
+    <!-- Reporter Details -->
+    <div class="card mt-3">
+      <div class="card-body">
+        <h5 class="card-title">Reporter Details</h5>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Reporter Name</label>
+            <input type="text" class="form-control" name="reporter" id="reporter_name"
+                   value="{{ record.get('reporter','') }}" placeholder="Full name">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Reporter Contact (email or phone)</label>
+            <input type="text" class="form-control" name="reporter_contact" id="reporter_contact"
+                   value="{{ record.get('reporter_contact','') }}" placeholder="email@company.com / +1-555-1234">
+          </div>
+        </div>
+        <div class="form-text mt-2">If "Anonymous" is enabled, these details will be removed on save.</div>
+      </div>
+    </div>
+
+    <script>
+      (function() {
+        function syncAnon() {
+          var anon = document.querySelector('input[name="anonymous"]');
+          var name = document.getElementById('reporter_name');
+          var contact = document.getElementById('reporter_contact');
+          if (!anon || !name || !contact) return;
+          var hide = !!anon.checked;
+          name.disabled = hide; contact.disabled = hide;
+          if (hide) { name.value = ""; contact.value = ""; }
+          var card = name.closest('.card');
+          if (card) { card.style.opacity = hide ? '0.5' : '1'; }
+        }
+        document.addEventListener('change', function(e){
+          if (e.target && e.target.name === 'anonymous') syncAnon();
+        });
+        window.addEventListener('DOMContentLoaded', syncAnon);
+      })();
+    </script>
+    
+</form>
+  {% endif %}
+
+  {% if rec.capa %}
+  <div class="mb-3">
+    <label class="form-label">Corrective Actions</label>
+    {% if rec.capa.chosen %}
+      <ul>
+        {% for a in rec.capa.chosen %}<li>{{ a }}</li>{% endfor %}
+      </ul>
+      <div class="text-muted small">
+        Confidence: {{ rec.capa.confidence or "—" }} | Rationale: {{ rec.capa.rationale or "—" }}
+      </div>
+    {% else %}
+      <p class="text-muted">No corrective actions selected yet.</p>
+    {% endif %}
+  </div>
+  {% endif %}
+  <a class="btn btn-outline-secondary" href="{{ url_for('incidents.incident_capa', iid=rec.id) }}">Suggest & Confirm CAPA</a>
+
+{% endblock %}

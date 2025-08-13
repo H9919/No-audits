@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-3">Incidents</h3>
+<div class="mb-3">
+  <a class="btn btn-primary" href="{{ url_for('incidents.new_incident') }}">New Incident</a>
+</div>
+<table class="table table-sm align-middle">
+  <thead>
+    <tr><th>ID</th><th>Type</th><th>Completeness</th><th>Status</th><th>Actions</th></tr>
+  </thead>
+  <tbody>
+  {% for r in rows %}
+    <tr>
+      <td><code>{{ r.id }}</code></td>
+      <td>{{ r.type }}</td>
+      <td><span class="badge bg-info badge-tight">{{ r.completeness }}%</span></td>
+      <td>{{ r.status }}</td>
+      <td class="d-flex gap-2">
+        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('incidents.edit_incident', iid=r.id) }}">Edit</a>
+        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('incidents.download_incident_pdf', iid=r.id) }}">Download PDF</a>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<div class="mt-4">
+  <h6>Required Categories by Type</h6>
+  <pre class="mb-0" style="white-space: pre-wrap;">{{ required_by_type|tojson(indent=2) }}</pre>
+</div>
+{% endblock %}

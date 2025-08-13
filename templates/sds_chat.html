@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-3">Chat with SDS: {{ rec.product_name }}</h3>
+<form method="post" class="card p-3 mb-3">
+  <label class="form-label">Your question</label>
+  <input class="form-control mb-2" name="question" value="{{ question or '' }}" placeholder="e.g., What PPE is required?">
+  <button class="btn btn-primary">Ask</button>
+</form>
+
+{% if answer %}
+<div class="card p-3">
+  <h6>Answer (scoped to this SDS)</h6>
+  <pre class="mb-0" style="white-space: pre-wrap;">{{ answer }}</pre>
+</div>
+{% endif %}
+{% endblock %}
+

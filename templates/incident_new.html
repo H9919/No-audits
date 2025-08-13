@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-3">New Incident</h3>
+<form method="post" class="card p-3">
+  <div class="mb-3">
+    <label class="form-label">Incident Type</label>
+    <select class="form-select" name="type">
+      <option>injury</option>
+      <option>vehicle</option>
+      <option>security</option>
+      <option>environmental</option>
+      <option>depot</option>
+      <option>near_miss</option>
+      <option>property</option>
+      <option>other</option>
+    </select>
+  </div>
+  {% for c in ["people","environment","cost","legal","reputation"] %}
+  <div class="mb-3">
+    <label class="form-label">{{ c|capitalize }} (optional now)</label>
+    <textarea class="form-control" name="{{ c }}" rows="2"></textarea>
+  </div>
+  {% endfor %}
+  
+  <div class="mb-3 form-check">
+    <input class="form-check-input" type="checkbox" name="anonymous" id="anon">
+    <label class="form-check-label" for="anon">Anonymous Reporter</label>
+  </div>
+  <div class="row">
+    <div class="col-md-4 mb-3">
+      <label class="form-label">Facility / Site Code</label>
+      <input class="form-control" type="text" name="facility_code">
+    </div>
+    <div class="col-md-4 mb-3">
+      <label class="form-label">Region</label>
+      <input class="form-control" type="text" name="region">
+    </div>
+  </div>
+  <div class="row">
+    <div class="col-md-4 mb-3">
+      <label class="form-label">Location Latitude</label>
+      <input class="form-control" type="text" name="location_lat" placeholder="e.g., 43.5448">
+    </div>
+    <div class="col-md-4 mb-3">
+      <label class="form-label">Location Longitude</label>
+      <input class="form-control" type="text" name="location_lng" placeholder="-80.2482">
+    </div>
+    <div class="col-md-4 mb-3">
+      <label class="form-label">Location (text)</label>
+      <input class="form-control" type="text" name="location_text" placeholder="Guelph, ON">
+    </div>
+  </div>
+
+  <button class="btn btn-primary">Create</button>
+
+    <!-- Reporter Details -->
+    <div class="card mt-3">
+      <div class="card-body">
+        <h5 class="card-title">Reporter Details</h5>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Reporter Name</label>
+            <input type="text" class="form-control" name="reporter" id="reporter_name" placeholder="Full name">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Reporter Contact (email or phone)</label>
+            <input type="text" class="form-control" name="reporter_contact" id="reporter_contact" placeholder="email@company.com / +1-555-1234">
+          </div>
+        </div>
+        <div class="form-text mt-2">If you check "Anonymous", we will not store these details.</div>
+      </div>
+    </div>
+
+    <script>
+      // Toggle reporter fields when anonymous is checked
+      (function() {
+        function syncAnon() {
+          var anon = document.querySelector('input[name="anonymous"]');
+          var name = document.getElementById('reporter_name');
+          var contact = document.getElementById('reporter_contact');
+          if (!anon || !name || !contact) return;
+          var hide = !!anon.checked;
+          name.disabled = hide; contact.disabled = hide;
+          if (hide) { name.value = ""; contact.value = ""; }
+          var card = name.closest('.card');
+          if (card) { card.style.opacity = hide ? '0.5' : '1'; }
+        }
+        document.addEventListener('change', function(e){
+          if (e.target && e.target.name === 'anonymous') syncAnon();
+        });
+        window.addEventListener('DOMContentLoaded', syncAnon);
+      })();
+    </script>
+    
+</form>
+{% endblock %}

@@ -1,0 +1,588 @@
+<!-- templates/base.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Smart EHS Management System{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #64748b;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --info-color: #06b6d4;
+        }
+
+        body {
+            background-color: #f8fafc;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .sidebar {
+            background: linear-gradient(180deg, #1e293b 0%, #334155 100%);
+            min-height: 100vh;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 250px;
+            z-index: 1000;
+        }
+
+        .sidebar .list-group-item {
+            background: transparent;
+            border: none;
+            color: #cbd5e1;
+            padding: 0.75rem 1.25rem;
+            border-radius: 0;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+        }
+
+        .sidebar .list-group-item:hover {
+            background-color: rgba(255,255,255,0.1);
+            color: white;
+            border-left-color: var(--primary-color);
+        }
+
+        .sidebar .list-group-item.active {
+            background-color: rgba(37, 99, 235, 0.2);
+            color: white;
+            border-left-color: var(--primary-color);
+        }
+
+        .sidebar-header {
+            color: white;
+            font-weight: 600;
+            text-align: center;
+            padding: 1.5rem 1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            margin-bottom: 0;
+        }
+
+        .main-content {
+            margin-left: 250px;
+            padding: 2rem;
+            min-height: 100vh;
+        }
+
+        .card {
+            border: none;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: all 0.2s;
+        }
+
+        .card:hover {
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+        }
+
+        .btn {
+            border-radius: 8px;
+            font-weight: 500;
+        }
+
+        .badge {
+            font-weight: 500;
+        }
+
+        .table th {
+            border-top: none;
+            font-weight: 600;
+            color: #475569;
+        }
+
+        .chatbot-widget {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1050;
+        }
+
+        .chatbot-toggle {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, var(--primary-color), #3b82f6);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            font-size: 1.5rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transition: all 0.3s;
+        }
+
+        .chatbot-toggle:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+        }
+
+        .chatbot-panel {
+            position: absolute;
+            bottom: 80px;
+            right: 0;
+            width: 400px;
+            height: 600px;
+            background: white;
+            border-radius: 1rem;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chatbot-header {
+            background: linear-gradient(135deg, var(--primary-color), #3b82f6);
+            color: white;
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chatbot-messages {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+            background: #f8fafc;
+        }
+
+        .chatbot-input {
+            padding: 1rem;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .message {
+            margin-bottom: 1rem;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .message-user {
+            text-align: right;
+        }
+
+        .message-bot {
+            text-align: left;
+        }
+
+        .message-bubble {
+            display: inline-block;
+            max-width: 80%;
+            padding: 0.75rem 1rem;
+            border-radius: 1rem;
+            word-wrap: break-word;
+        }
+
+        .message-user .message-bubble {
+            background: var(--primary-color);
+            color: white;
+            border-bottom-right-radius: 0.25rem;
+        }
+
+        .message-bot .message-bubble {
+            background: white;
+            color: #334155;
+            border: 1px solid #e2e8f0;
+            border-bottom-left-radius: 0.25rem;
+        }
+
+        .action-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+        }
+
+        .action-btn {
+            background: rgba(37, 99, 235, 0.1);
+            border: 1px solid var(--primary-color);
+            color: var(--primary-color);
+            padding: 0.5rem 1rem;
+            border-radius: 1rem;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+
+        .action-btn:hover {
+            background: var(--primary-color);
+            color: white;
+            transform: translateY(-1px);
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s;
+            }
+            
+            .sidebar.show {
+                transform: translateX(0);
+            }
+            
+            .main-content {
+                margin-left: 0;
+                padding: 1rem;
+            }
+            
+            .chatbot-panel {
+                width: 320px;
+                height: 500px;
+            }
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Sidebar Navigation -->
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h4><i class="bi bi-shield-check me-2"></i>Smart EHS</h4>
+        </div>
+        
+        <div class="list-group list-group-flush">
+            <a href="/" class="list-group-item list-group-item-action">
+                <i class="bi bi-house me-2"></i> Dashboard
+            </a>
+            <a href="/incidents" class="list-group-item list-group-item-action">
+                <i class="bi bi-exclamation-triangle me-2"></i> Incidents
+            </a>
+            <a href="/safety-concerns" class="list-group-item list-group-item-action">
+                <i class="bi bi-shield-exclamation me-2"></i> Safety Concerns
+            </a>
+            <a href="/capa" class="list-group-item list-group-item-action">
+                <i class="bi bi-arrow-repeat me-2"></i> CAPAs
+            </a>
+            <a href="/risk/register" class="list-group-item list-group-item-action">
+                <i class="bi bi-graph-up me-2"></i> Risk Register
+            </a><a href="/sds" class="list-group-item list-group-item-action">
+                <i class="bi bi-file-earmark-text me-2"></i> SDS Library
+            </a></div>
+
+        <!-- Quick Actions in Sidebar -->
+        <div class="mt-auto p-3 border-top border-secondary">
+            <h6 class="text-light opacity-75 mb-2">Quick Actions</h6>
+            <div class="d-grid gap-1">
+                <a href="/incidents/new" class="btn btn-sm btn-danger">
+                    <i class="bi bi-plus me-1"></i> Report Incident
+                </a>
+                <a href="/safety-concerns/new" class="btn btn-sm btn-warning">
+                    <i class="bi bi-plus me-1"></i> Safety Concern
+                </a>
+                <a href="/sds/upload" class="btn btn-sm btn-success">
+                    <i class="bi bi-upload me-1"></i> Upload SDS
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+        <!-- Mobile Menu Toggle -->
+        <div class="d-md-none mb-3">
+            <button class="btn btn-outline-primary" type="button" onclick="toggleSidebar()">
+                <i class="bi bi-list"></i> Menu
+            </button>
+        </div>
+
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages mb-4">
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <!-- Page Content -->
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Floating Chatbot Widget (Global) -->
+    <div class="chatbot-widget">
+        <div class="chatbot-panel" id="chatbotPanel">
+            <div class="chatbot-header">
+                <h6 class="mb-0">
+                    <i class="bi bi-robot me-2"></i>EHS Assistant
+                </h6>
+                <button class="btn btn-sm btn-outline-light" onclick="toggleChatbot()">
+                    <i class="bi bi-x"></i>
+                </button>
+            </div>
+            <div class="chatbot-messages" id="chatbotMessages">
+                <!-- Welcome message -->
+                <div class="message message-bot">
+                    <div class="message-bubble">
+                        <strong>👋 Hello! I'm your Smart EHS Assistant.</strong><br><br>
+                        I can help you with anything on this page or guide you to what you need:
+                        <div class="action-buttons">
+                            <button class="action-btn" onclick="sendChatMessage('Help with this page')">📖 Help with this page</button>
+                            <button class="action-btn" onclick="sendChatMessage('Report incident')">🚨 Report Incident</button>
+                            <button class="action-btn" onclick="sendChatMessage('Find SDS')">📋 Find SDS</button>
+                            <button class="action-btn" onclick="sendChatMessage('Safety concern')">🛡️ Safety Concern</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="chatbot-input">
+                <div class="input-group">
+                    <input type="text" class="form-control" id="chatInput" placeholder="Ask me anything about EHS..." onkeypress="handleChatKeyPress(event)">
+                    <button class="btn btn-primary" onclick="sendChatMessage()">
+                        <i class="bi bi-send"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <button class="chatbot-toggle" onclick="toggleChatbot()" id="chatbotToggle">
+            <i class="bi bi-robot"></i>
+        </button>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Global chatbot functionality
+        let chatHistory = [];
+        let chatbotOpen = false;
+
+        // Mobile sidebar toggle
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('show');
+        }
+
+        // Global chatbot functions
+        function toggleChatbot() {
+            const panel = document.getElementById('chatbotPanel');
+            const toggle = document.getElementById('chatbotToggle');
+            
+            chatbotOpen = !chatbotOpen;
+            
+            if (chatbotOpen) {
+                panel.style.display = 'flex';
+                toggle.innerHTML = '<i class="bi bi-x"></i>';
+                document.getElementById('chatInput').focus();
+                
+                // Add context message if this is first time opening on a specific page
+                if (chatHistory.length === 1) { // Only welcome message
+                    addContextualWelcome();
+                }
+            } else {
+                panel.style.display = 'none';
+                toggle.innerHTML = '<i class="bi bi-robot"></i>';
+            }
+        }
+
+        function addContextualWelcome() {
+            const currentPage = window.location.pathname;
+            let contextMessage = "";
+            
+            if (currentPage.includes('/incidents')) {
+                contextMessage = "I see you're on the Incidents page. I can help you report incidents, understand the process, or explain validation requirements.";
+            } else if (currentPage.includes('/safety-concerns')) {
+                contextMessage = "You're viewing Safety Concerns. I can help you submit observations, understand the OSCR process, or check on existing concerns.";
+            } else if (currentPage.includes('/capa')) {
+                contextMessage = "I notice you're working with CAPAs. I can help you create corrective actions, track progress, or explain the difference between corrective and preventive actions.";
+            } else if (currentPage.includes('/risk')) {
+                contextMessage = "You're on the Risk Management page. I can guide you through risk assessments, explain the ERC matrix, or help interpret risk scores.";
+else if (currentPage.includes('/sds')) {
+                contextMessage = "You're browsing the SDS Library. I can help you find specific chemicals, upload new documents, or answer questions about chemical safety.";
+            }
+            
+            if (contextMessage) {
+                setTimeout(() => {
+                    addChatMessage(contextMessage, 'bot');
+                }, 1000);
+            }
+        }
+
+        function handleChatKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendChatMessage();
+            }
+        }
+
+        function sendChatMessage(message) {
+            const input = document.getElementById('chatInput');
+            const userMessage = message || input.value.trim();
+            
+            if (!userMessage) return;
+            
+            // Add user message to chat
+            addChatMessage(userMessage, 'user');
+            
+            // Clear input if it was typed
+            if (!message) {
+                input.value = '';
+            }
+            
+            // Show typing indicator
+            showTypingIndicator();
+            
+            // Get current page context
+            const context = {
+                page: window.location.pathname,
+                timestamp: new Date().toISOString(),
+                history: chatHistory.slice(-5) // Last 5 exchanges for context
+            };
+            
+            // Send to chatbot API
+            fetch('/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    message: userMessage,
+                    user_id: 'global_user',
+                    context: context
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideTypingIndicator();
+                addChatMessage(data.message, 'bot', data);
+                
+                // Store conversation in history
+                chatHistory.push({
+                    user: userMessage,
+                    bot: data.message,
+                    timestamp: new Date().toISOString()
+                });
+                
+                // Keep only last 20 exchanges
+                if (chatHistory.length > 20) {
+                    chatHistory = chatHistory.slice(-20);
+                }
+            })
+            .catch(error => {
+                hideTypingIndicator();
+                addChatMessage("I'm sorry, I'm having trouble connecting right now. Please try again or contact support if the issue persists.", 'bot');
+                console.error('Chat error:', error);
+            });
+        }
+
+        function addChatMessage(message, sender, data = null) {
+            const messagesContainer = document.getElementById('chatbotMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message message-${sender}`;
+            
+            let messageContent = `<div class="message-bubble">${message}`;
+            
+            // Add action buttons if provided
+            if (data && data.actions) {
+                messageContent += '<div class="action-buttons">';
+                data.actions.forEach(action => {
+                    if (action.action === 'navigate') {
+                        messageContent += `<a href="${action.url}" class="action-btn">${action.text}</a>`;
+                    } else {
+                        messageContent += `<button class="action-btn" onclick="sendChatMessage('${action.text.replace(/'/g, "\\'")}')">${action.text}</button>`;
+                    }
+                });
+                messageContent += '</div>';
+            }
+            
+            // Add quick replies if provided
+            if (data && data.quick_replies) {
+                messageContent += '<div class="action-buttons">';
+                data.quick_replies.forEach(reply => {
+                    messageContent += `<button class="action-btn" onclick="sendChatMessage('${reply.replace(/'/g, "\\'")}')">${reply}</button>`;
+                });
+                messageContent += '</div>';
+            }
+            
+            messageContent += '</div>';
+            messageDiv.innerHTML = messageContent;
+            
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function showTypingIndicator() {
+            const messagesContainer = document.getElementById('chatbotMessages');
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'message message-bot';
+            typingDiv.id = 'typingIndicator';
+            typingDiv.innerHTML = `
+                <div class="message-bubble">
+                    <div class="typing-dots">
+                        <span></span><span></span><span></span>
+                    </div>
+                </div>
+            `;
+            messagesContainer.appendChild(typingDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function hideTypingIndicator() {
+            const typingIndicator = document.getElementById('typingIndicator');
+            if (typingIndicator) {
+                typingIndicator.remove();
+            }
+        }
+
+        // Auto-hide flash messages after 5 seconds
+        setTimeout(function() {
+            const alerts = document.querySelectorAll('.flash-messages .alert');
+            alerts.forEach(alert => {
+                if (alert.classList.contains('alert-success')) {
+                    alert.style.opacity = '0';
+                    setTimeout(() => alert.remove(), 300);
+                }
+            });
+        }, 5000);
+
+        // Add active class to current page in navigation
+        document.addEventListener('DOMContentLoaded', function() {
+            const currentPath = window.location.pathname;
+            const navLinks = document.querySelectorAll('.sidebar .list-group-item');
+            
+            navLinks.forEach(link => {
+                const href = link.getAttribute('href');
+                if (href === currentPath || 
+                    (currentPath !== '/' && href !== '/' && currentPath.startsWith(href))) {
+                    link.classList.add('active');
+                }
+            });
+        });
+
+        // CSS for typing indicator
+        const style = document.createElement('style');
+        style.textContent = `
+            .typing-dots {
+                display: flex;
+                gap: 4px;
+            }
+            .typing-dots span {
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: #6b7280;
+                animation: typing 1.4s infinite ease-in-out;
+            }
+            .typing-dots span:nth-child(1) { animation-delay: -0.32s; }
+            .typing-dots span:nth-child(2) { animation-delay: -0.16s; }
+            @keyframes typing {
+                0%, 80%, 100% { transform: scale(0.8); opacity: 0.5; }
+                40% { transform: scale(1); opacity: 1; }
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

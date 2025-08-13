@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-3">SDS Library</h3>
+<table class="table table-sm align-middle">
+  <thead>
+    <tr>
+      <th>ID</th><th>Product</th><th>File</th><th>Created</th><th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for r in rows %}
+    <tr>
+      <td><code>{{ r.id }}</code></td>
+      <td>{{ r.product_name }}</td>
+      <td>{{ r.file_name }}</td>
+      <td>{{ r.created_ts|round|int }}</td>
+      <td class="d-flex gap-2">
+        <a class="btn btn-sm btn-primary" href="{{ url_for('sds.sds_view', sid=r.id) }}">View</a>
+        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('sds.sds_download', sid=r.id) }}">Download</a>
+        <a class="btn btn-sm btn-outline-dark" href="{{ url_for('sds.sds_chat', sid=r.id) }}">Chat</a>
+        <a class="btn btn-sm btn-outline-success" href="{{ url_for('sds.sds_qr_png', sid=r.id) }}">QR</a>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
+

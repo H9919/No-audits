@@ -1,0 +1,98 @@
+<!-- templates/risk_result.html - Risk Assessment Result -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Risk Assessment Result</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+</head>
+<body>
+<div class="container mt-4">
+    <h3 class="mb-4">Risk Assessment Result</h3>
+    
+    {% if risk_data %}
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card shadow mb-4">
+                <div class="card-header bg-{{ 'danger' if risk_data.risk_level == 'Critical' else ('warning' if risk_data.risk_level == 'High' else ('info' if risk_data.risk_level == 'Medium' else 'success')) }} text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-graph-up"></i> 
+                        Risk Level: {{ risk_data.risk_level }}
+                        <span class="badge bg-light text-dark ms-2">Score: {{ risk_data.risk_score }}</span>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <h6>Assessment Details</h6>
+                    <p><strong>Title:</strong> {{ risk_data.title }}</p>
+                    <p><strong>Description:</strong> {{ risk_data.description }}</p>
+                    
+                    <hr>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Likelihood Assessment</h6>
+                            <p><strong>Score:</strong> {{ risk_data.likelihood }}/10</p>
+                            {% if likelihood_scale %}
+                            <p><strong>Level:</strong> {{ likelihood_scale[risk_data.likelihood].label if risk_data.likelihood in likelihood_scale else 'Unknown' }}</p>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Severity Breakdown</h6>
+                            {% for category, score in risk_data.severity_scores.items() %}
+                            <p><strong>{{ category.title() }}:</strong> {{ score }}/10</p>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="d-flex gap-2">
+                <a href="/risk/assess" class="btn btn-primary">
+                    <i class="bi bi-arrow-repeat"></i> New Assessment
+                </a>
+                <a href="/risk/register" class="btn btn-outline-primary">
+                    <i class="bi bi-list"></i> View Risk Register
+                </a>
+                <a href="/capa/new?source=risk&source_id={{ risk_data.id }}" class="btn btn-success">
+                    <i class="bi bi-plus-circle"></i> Create CAPA
+                </a>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card shadow">
+                <div class="card-header">
+                    <h6 class="mb-0">Risk Matrix</h6>
+                </div>
+                <div class="card-body">
+                    <p>Your assessment places this risk in the <strong>{{ risk_data.risk_level }}</strong> category.</p>
+                    
+                    {% if risk_data.risk_level in ['Critical', 'High'] %}
+                    <div class="alert alert-warning">
+                        <strong>Action Required:</strong> This risk requires immediate attention and mitigation measures.
+                    </div>
+                    {% elif risk_data.risk_level == 'Medium' %}
+                    <div class="alert alert-info">
+                        <strong>Monitor:</strong> This risk should be monitored and controls reviewed.
+                    </div>
+                    {% else %}
+                    <div class="alert alert-success">
+                        <strong>Acceptable:</strong> This risk is within acceptable limits but should be monitored.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-danger">
+        <h5>Error</h5>
+        <p>Risk assessment data is not available.</p>
+        <a href="/risk/assess" class="btn btn-primary">Start New Assessment</a>
+    </div>
+    {% endif %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

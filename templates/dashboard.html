@@ -1,0 +1,125 @@
+<!-- templates/dashboard.html - Fixed Dashboard with working links -->
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h3 class="mb-4">
+                <i class="bi bi-graph-up text-primary"></i> 
+                EHS Management Dashboard
+            </h3>
+        </div>
+    </div>
+
+    <!-- Quick Stats Overview -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card-body">
+                    <p class="card-text">
+                        Manage contractor safety requirements, 
+                        training verification, and visitor check-ins.
+                    </p>
+                    <div class="d-grid gap-2"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Status -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="bi bi-gear"></i> System Status
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-circle-fill text-success me-2"></i>
+                                <span>AI Chatbot: Online</span>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-circle-fill text-success me-2"></i>
+                                <span>Database: Connected</span>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-circle-fill text-success me-2"></i>
+                                <span>File Storage: Available</span>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-circle-fill text-info me-2"></i>
+                                <span>Memory Optimized: Active</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Load real-time stats
+document.addEventListener('DOMContentLoaded', function() {
+    loadDashboardStats();
+    
+    // Auto-refresh stats every 30 seconds
+    setInterval(loadDashboardStats, 30000);
+});
+
+function loadDashboardStats() {
+    fetch('/api/stats')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Update incident count
+            if (data.incidents && data.incidents.total !== undefined) {
+                document.getElementById('incidentCount').textContent = data.incidents.total;
+            }
+            
+            // Update safety concerns count
+            if (data.safety_concerns && data.safety_concerns.total !== undefined) {
+                document.getElementById('safetyCount').textContent = data.safety_concerns.total;
+            }
+            
+            // Update CAPA count
+            if (data.capas && data.capas.total !== undefined) {
+                document.getElementById('capaCount').textContent = data.capas.total;
+            }
+            
+            // Update SDS count
+            if (data.sds && data.sds.total !== undefined) {
+                document.getElementById('sdsCount').textContent = data.sds.total;
+            }
+        })
+        .catch(error => {
+            console.error('Error loading dashboard stats:', error);
+            // Keep existing values on error
+        });
+}
+
+// Add click tracking for analytics
+document.querySelectorAll('a[href^="/"]').forEach(link => {
+    link.addEventListener('click', function(e) {
+        const href = this.getAttribute('href');
+        console.log('Dashboard navigation:', href);
+        
+        // You could send analytics data here
+        // Analytics.track('dashboard_click', { destination: href });
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="text-center">
+                <div class="mb-4">
+                    <i class="bi bi-exclamation-triangle display-1 text-warning"></i>
+                </div>
+                <h3 class="mb-3">Page Not Found</h3>
+                <p class="text-muted mb-4">
+                    The page you're looking for doesn't exist or may have been moved.
+                </p>
+                
+                <div class="alert alert-info">
+                    <h6><i class="bi bi-lightbulb"></i> Try These Instead</h6>
+                    <div class="d-grid gap-2">
+                        <a href="/" class="btn btn-primary btn-sm">
+                            <i class="bi bi-house"></i> Go to Dashboard
+                        </a>
+                        <a href="/incidents/new" class="btn btn-outline-danger btn-sm">
+                            <i class="bi bi-plus"></i> Report Incident
+                        </a>
+                        <a href="/sds" class="btn btn-outline-success btn-sm">
+                            <i class="bi bi-file-text"></i> Browse SDS Library
+                        </a>
+                    </div>
+                </div>
+                
+                {% if blueprints_loaded %}
+                <div class="mt-4">
+                    <h6>Available Modules:</h6>
+                    <div class="d-flex flex-wrap gap-1 justify-content-center">
+                        {% for module in blueprints_loaded %}
+                        <span class="badge bg-success">{{ module }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

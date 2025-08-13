@@ -1,0 +1,126 @@
+<!-- templates/safety_concern_new.html -->
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-4">
+    <i class="bi bi-shield-exclamation text-warning"></i> 
+    {% if anonymous %}Anonymous {% endif %}Safety Concern Report
+</h3>
+
+<div class="alert alert-info">
+    <h6><i class="bi bi-shield-check"></i> Your Safety Matters</h6>
+    Thank you for speaking up! Every safety observation helps create a safer workplace for everyone.
+    All reports are taken seriously and handled confidentially.
+</div>
+
+<form method="post" class="card p-4">
+    <div class="row">
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label class="form-label">Report Type</label>
+                <select class="form-select" name="type" required>
+                    <option value="">Select type</option>
+                    <option value="concern" {{ 'selected' if concern_type == 'concern' }}>Safety Concern/Observation</option>
+                    <option value="recognition">Safety Recognition</option>
+                </select>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label class="form-label">Location</label>
+                <input type="text" class="form-control" name="location" placeholder="Building, area, or specific location">
+            </div>
+        </div>
+    </div>
+    
+    <div class="mb-3">
+        <label class="form-label">Title/Summary <span class="text-danger">*</span></label>
+        <input type="text" class="form-control" name="title" required placeholder="Brief description of the concern">
+    </div>
+    
+    <div class="mb-3">
+        <label class="form-label">Detailed Description <span class="text-danger">*</span></label>
+        <textarea class="form-control" name="description" rows="4" required 
+                  placeholder="Describe what you observed, including who, what, when, where, and how"></textarea>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label class="form-label">Hazard Type</label>
+                <select class="form-select" name="hazard_type">
+                    <option value="">Select hazard type</option>
+                    <option value="slip_trip_fall">Slip/Trip/Fall</option>
+                    <option value="chemical">Chemical Exposure</option>
+                    <option value="equipment">Equipment/Machinery</option>
+                    <option value="ergonomic">Ergonomic</option>
+                    <option value="electrical">Electrical</option>
+                    <option value="fire">Fire/Explosion</option>
+                    <option value="environmental">Environmental</option>
+                    <option value="security">Security</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label class="form-label">Risk Level</label>
+                <select class="form-select" name="risk_level">
+                    <option value="low">Low - Minor issue</option>
+                    <option value="medium" selected>Medium - Could cause harm</option>
+                    <option value="high">High - Likely to cause serious harm</option>
+                </select>
+            </div>
+        </div>
+    </div>
+    
+            <div class="mb-3">
+        <label class="form-label">Immediate Action Taken</label>
+        <textarea class="form-control" name="immediate_action" rows="2" 
+                  placeholder="What immediate steps were taken to address the concern?"></textarea>
+    </div>
+    
+    <div class="mb-4">
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="anonymous" id="anonymous" 
+                   {{ 'checked' if anonymous else '' }} onchange="toggleReporterInfo()">
+            <label class="form-check-label" for="anonymous">
+                Submit anonymously
+            </label>
+            <div class="form-text">
+                If you submit anonymously, you won't receive updates on the resolution, 
+                but your concern will still be investigated.
+            </div>
+        </div>
+    </div>
+    
+    <div id="reporter-info" {{ 'style="display:none"' if anonymous else '' }}>
+        <div class="mb-3">
+            <label class="form-label">Your Name (Optional)</label>
+            <input type="text" class="form-control" name="reporter" 
+                   placeholder="Your name for follow-up communication">
+        </div>
+    </div>
+    
+    <div class="d-flex justify-content-between">
+        <a href="{{ url_for('safety_concerns.concerns_list') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Cancel
+        </a>
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-send"></i> Submit Safety Concern
+        </button>
+    </div>
+</form>
+
+<script>
+function toggleReporterInfo() {
+    const checkbox = document.getElementById('anonymous');
+    const reporterInfo = document.getElementById('reporter-info');
+    
+    if (checkbox.checked) {
+        reporterInfo.style.display = 'none';
+    } else {
+        reporterInfo.style.display = 'block';
+    }
+}
+</script>
+{% endblock %}

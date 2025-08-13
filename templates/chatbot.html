@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart EHS Assistant</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #64748b;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .chat-container {
+            max-width: 800px;
+            margin: 0 auto;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 1rem;
+            border-radius: 1rem 1rem 0 0;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+        }
+
+        .chat-input {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 1rem;
+            border-radius: 0 0 1rem 1rem;
+            box-shadow: 0 -4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .message {
+            margin-bottom: 1rem;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message-user {
+            text-align: right;
+        }
+
+        .message-bot {
+            text-align: left;
+        }
+
+        .message-bubble {
+            display: inline-block;
+            max-width: 70%;
+            padding: 0.75rem 1rem;
+            border-radius: 1rem;
+            word-wrap: break-word;
+        }
+
+        .message-user .message-bubble {
+            background: var(--primary-color);
+            color: white;
+            border-bottom-right-radius: 0.25rem;
+        }
+
+        .message-bot .message-bubble {
+            background: #f8fafc;
+            color: #334155;
+            border: 1px solid #e2e8f0;
+            border-bottom-left-radius: 0.25rem;
+        }
+
+        .quick-replies {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+        }
+
+        .quick-reply-btn {
+            background: rgba(37, 99, 235, 0.1);
+            border: 1px solid var(--primary-color);
+            color: var(--primary-color);
+            padding: 0.5rem 1rem;
+            border-radius: 1rem;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .quick-reply-btn:hover {
+            background: var(--primary-color);
+            color: white;
+            transform: translateY(-1px);
+        }
+
+        .action-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+
+        .action-btn {
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .btn-primary { background: var(--primary-color); color: white; }
+        .btn-secondary { background: var(--secondary-color); color: white; }
+        .btn-success { background: var(--success-color); color: white; }
+        .btn-warning { background: var(--warning-color); color: white; }
+        .btn-danger { background: var(--danger-color); color: white; }
+        .btn-info { background: #06b6d4; color: white; }
+
+        .risk-matrix {
+            background: #f8fafc;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-top: 1rem;
+            border: 1px solid #e2e8f0;
+        }
+
+        .menu-items {
+            list-style: none;
+            padding: 0;
+            margin-top: 1rem;
+        }
+
+        .menu-item {
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            background: #f8fafc;
+            border-radius: 0.5rem;
+            border: 1px solid #e2e8f0;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .menu-item:hover {
+            background: #e2e8f0;
+            transform: translateX(5px);
+        }
+
+        .typing-indicator {
+            display: none;
+            text-align: left;
+            margin-bottom: 1rem;
+        }
+
+        .typing-dots {
+            display: inline-block;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 1rem;
+            padding: 0.75rem 1rem;
+        }
+
+        .typing-dots::after {
+            content: '...';
+            animation: typing 1.5s infinite;
+        }
+
+        @keyframes typing {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+
+        .emergency-banner {
+            background: linear-gradient(45deg, #ef4444, #dc2626);
+            color: white;
+            padding: 0.75rem;
+            text-align: center;
+            font-weight: bold;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+
+        .chat-input-container {
+            position: relative;
+        }
+
+        .chat-input-field {
+            width: 100%;
+            border: 2px solid #e2e8f0;
+            border-radius: 2rem;
+            padding: 0.75rem 3.5rem 0.75rem 1rem;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .chat-input-field:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .send-btn {
+            position: absolute;
+            right: 0.5rem;
+            top: 50%;
+            transform: translateY(-50%);
+            background: var(--primary-color);
+            border: none;
+            color: white;
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .send-btn:hover {
+            background: #1d4ed8;
+            transform: translateY(-50%) scale(1.1);
+        }
+
+        .assistant-avatar {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(45deg, var(--primary-color), #3b82f6);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            margin-right: 0.75rem;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(45deg, var(--success-color), #059669);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            margin-left: 0.75rem;
+        }
+
+        .message-content {
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .guidance-box {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid var(--success-color);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+
+        .guidance-box h6 {
+            color: var(--success-color);
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="chat-container">
+            <!-- Header -->
+            <div class="chat-header">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center">
+                        <div class="assistant-avatar">
+                            <i class="bi bi-robot"></i>
+                        </div>
+                        <div>
+                            <h5 class="mb-0">Smart EHS Assistant</h5>
+                            <small class="text-muted">Your AI safety companion</small>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-primary btn-sm" onclick="showMenu()">
+                            <i class="bi bi-list"></i> Menu
+                        </button>
+                        <button class="btn btn-outline-danger btn-sm" onclick="showEmergency()">
+                            <i class="bi bi-exclamation-triangle"></i> Emergency
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Messages -->
+            <div class="chat-messages" id="chatMessages">
+                <!-- Welcome message -->
+                <div class="message message-bot">
+                    <div class="message-content">
+                        <div class="assistant-avatar">
+                            <i class="bi bi-robot"></i>
+                        </div>
+                        <div class="message-bubble">
+                            <strong>Welcome to Smart EHS! 👋</strong><br>
+                            I'm here to help you with all your Environmental, Health & Safety needs. I can assist you with:
+                            
+                            <div class="menu-items">
+                                <div class="menu-item" onclick="sendMessage('Report an incident')">
+                                    🚨 Report Incidents & Safety Concerns
+                                </div>
+                                <div class="menu-item" onclick="sendMessage('Risk assessment')">
+                                    📊 Risk Assessment & Management
+                                </div>
+                                <div class="menu-item" onclick="sendMessage('Corrective actions')">
+                                    ✅ Corrective Actions (CAPA)
+                                </div>
+                                <div class="menu-item" onclick="sendMessage('Find SDS')">
+                                    📋 Safety Data Sheets (SDS)
+                                </div>
+                                <div class="menu-item" onclick="sendMessage('Start audit')">
+                                </div>
+                            </div>
+
+                            <div class="guidance-box">
+                                <h6><i class="bi bi-lightbulb"></i> Quick Tip</h6>
+                                Just type what you need help with, like "I need to report an injury" or "Where can I find the SDS for acetone?"
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Typing indicator -->
+            <div class="typing-indicator" id="typingIndicator">
+                <div class="message-content">
+                    <div class="assistant-avatar">
+                        <i class="bi bi-robot"></i>
+                    </div>
+                    <div class="typing-dots"></div>
+                </div>
+            </div>
+
+            <!-- Input -->
+            <div class="chat-input">
+                <div class="chat-input-container">
+                    <input 
+                        type="text" 
+                        class="chat-input-field" 
+                        id="messageInput" 
+                        placeholder="Type your message here..."
+                        onkeypress="handleKeyPress(event)"
+                    >
+                    <button class="send-btn" onclick="sendUserMessage()">
+                        <i class="bi bi-send"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let messageHistory = [];
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendUserMessage();
+            }
+        }
+
+        function sendUserMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            
+            if (message) {
+                addUserMessage(message);
+                input.value = '';
+                processMessage(message);
+            }
+        }
+
+        function sendMessage(message) {
+            addUserMessage(message);
+            processMessage(message);
+        }
+
+        function addUserMessage(message) {
+            const messagesContainer = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message message-user';
+            messageDiv.innerHTML = `
+                <div class="message-content">
+                    <div class="message-bubble">${message}</div>
+                    <div class="user-avatar">
+                        <i class="bi bi-person"></i>
+                    </div>
+                </div>
+            `;
+            messagesContainer.appendChild(messageDiv);
+            scrollToBottom();
+        }
+
+        function addBotMessage(response) {
+            const messagesContainer = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message message-bot';
+            
+            let messageContent = `
+                <div class="message-content">
+                    <div class="assistant-avatar">
+                        <i class="bi bi-robot"></i>
+                    </div>
+                    <div class="message-bubble">
+                        ${response.message}
+            `;
+
+            // Add action buttons
+            if (response.actions && response.actions.length > 0) {
+                messageContent += '<div class="action-buttons">';
+                response.actions.forEach(action => {
+                    const btnClass = `btn-${action.style || 'primary'}`;
+                    if (action.action === 'navigate') {
+                        messageContent += `
+                            <a href="${action.url}" class="action-btn ${btnClass}">
+                                ${getActionIcon(action.style)} ${action.text}
+                            </a>
+                        `;
+                    } else if (action.action === 'show_emergency_info') {
+                        messageContent += `
+                            <button class="action-btn ${btnClass}" onclick="showEmergencyInfo()">
+                                ${getActionIcon(action.style)} ${action.text}
+                            </button>
+                        `;
+                    }
+                });
+                messageContent += '</div>';
+            }
+
+            // Add guidance
+            if (response.guidance) {
+                messageContent += `
+                    <div class="guidance-box">
+                        <h6><i class="bi bi-info-circle"></i> Guidance</h6>
+                        ${response.guidance}
+                    </div>
+                `;
+            }
+
+            // Add risk information
+            if (response.risk_info) {
+                messageContent += `
+                    <div class="risk-matrix">
+                        <h6><i class="bi bi-exclamation-triangle"></i> Risk Assessment Scale</h6>
+                        <p><strong>Likelihood Scale (0-10):</strong></p>
+                        <ul>
+                `;
+                Object.entries(response.risk_info.likelihood_scale).forEach(([score, info]) => {
+                    messageContent += `<li><strong>${score}:</strong> ${info.label} - ${info.description}</li>`;
+                });
+                messageContent += `
+                        </ul>
+                        <p><strong>Severity Categories:</strong> ${response.risk_info.severity_categories.join(', ')}</p>
+                    </div>
+                `;
+            }
+
+            // Add quick replies
+            if (response.quick_replies && response.quick_replies.length > 0) {
+                messageContent += '<div class="quick-replies">';
+                response.quick_replies.forEach(reply => {
+                    messageContent += `
+                        <button class="quick-reply-btn" onclick="sendMessage('${reply}')">
+                            ${reply}
+                        </button>
+                    `;
+                });
+                messageContent += '</div>';
+            }
+
+            messageContent += '</div></div>';
+            messageDiv.innerHTML = messageContent;
+            messagesContainer.appendChild(messageDiv);
+            scrollToBottom();
+        }
+
+        function getActionIcon(style) {
+            const icons = {
+                primary: '<i class="bi bi-arrow-right"></i>',
+                secondary: '<i class="bi bi-eye"></i>',
+                danger: '<i class="bi bi-exclamation-triangle"></i>',
+                success: '<i class="bi bi-check-circle"></i>',
+                warning: '<i class="bi bi-exclamation-circle"></i>',
+                info: '<i class="bi bi-info-circle"></i>'
+            };
+            return icons[style] || '<i class="bi bi-arrow-right"></i>';
+        }
+
+        function showTyping() {
+            document.getElementById('typingIndicator').style.display = 'block';
+            scrollToBottom();
+        }
+
+        function hideTyping() {
+            document.getElementById('typingIndicator').style.display = 'none';
+        }
+
+        function scrollToBottom() {
+            const messagesContainer = document.getElementById('chatMessages');
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        async function processMessage(message) {
+            showTyping();
+            
+            // Simulate API call delay
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        user_id: 'demo_user'
+                    })
+                });
+                
+                const data = await response.json();
+                hideTyping();
+                addBotMessage(data);
+                
+            } catch (error) {
+                hideTyping();
+                addBotMessage({
+                    message: "I'm sorry, I'm having trouble connecting right now. Please try again or contact support if the issue persists.",
+                    type: "error"
+                });
+            }
+        }
+
+        function showMenu() {
+            sendMessage('Show main menu');
+        }
+
+        function showEmergency() {
+            const messagesContainer = document.getElementById('chatMessages');
+            const emergencyDiv = document.createElement('div');
+            emergencyDiv.className = 'message message-bot';
+            emergencyDiv.innerHTML = `
+                <div class="message-content">
+                    <div class="assistant-avatar">
+                        <i class="bi bi-exclamation-triangle"></i>
+                    </div>
+                    <div class="message-bubble">
+                        <div class="emergency-banner">
+                            🚨 EMERGENCY CONTACTS 🚨
+                        </div>
+                        <strong>Immediate Emergencies:</strong><br>
+                        • Call 911 for fire, medical, or police emergencies<br>
+                        • Site Emergency: (555) 123-4567<br>
+                        • Security: (555) 123-4568<br><br>
+                        
+                        <strong>EHS Hotline:</strong><br>
+                        • Safety Concerns: (555) 123-4569<br>
+                        • Environmental Spills: (555) 123-4570<br><br>
+                        
+                        <div class="action-buttons">
+                            <button class="action-btn btn-danger" onclick="sendMessage('Report emergency incident')">
+                                <i class="bi bi-exclamation-triangle"></i> Report Emergency
+                            </button>
+                            <button class="action-btn btn-warning" onclick="sendMessage('Safety concern')">
+                                <i class="bi bi-shield-exclamation"></i> Safety Concern
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            messagesContainer.appendChild(emergencyDiv);
+            scrollToBottom();
+        }
+
+        function showEmergencyInfo() {
+            showEmergency();
+        }
+
+        // Auto-focus on input
+        document.getElementById('messageInput').focus();
+    </script>
+</body>
+</html>

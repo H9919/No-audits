@@ -1,0 +1,14 @@
+Flask==3.0.3
+Werkzeug==3.0.3
+python-dotenv==1.0.1
+pymupdf==1.24.10
+qrcode==7.4.2
+Pillow==10.4.0
+markdown==3.6
+reportlab==4.2.2
+numpy==2.0.1
+gunicorn==21.2.0
+
+# Optional AI features (only if ENABLE_SBERT=true)
+# sentence-transformers==3.0.1
+# torch==2.5.1
