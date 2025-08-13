@@ -1,4 +1,3 @@
-<!-- templates/capa_list.html - Complete CAPA Management List -->
 {% extends "base.html" %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -10,208 +9,153 @@
         <a href="{{ url_for('capa.capa_dashboard') }}" class="btn btn-info">
             <i class="bi bi-graph-up"></i> Dashboard
         </a>
+        <div class="btn-group ms-2" role="group">
+            <button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                <i class="bi bi-gear"></i> More
+            </button>
+            <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="{{ url_for('capa.assigned_capas') }}">
+                    <i class="bi bi-person-gear"></i> My CAPAs
+                </a></li>
+                <li><a class="dropdown-item" href="#" onclick="showOverdueAlert()">
+                    <i class="bi bi-exclamation-triangle"></i> Overdue Alert
+                </a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item" href="#" onclick="bulkAssign()">
+                    <i class="bi bi-people"></i> Bulk Assign
+                </a></li>
+            </ul>
+        </div>
     </div>
 </div>
 
-<!-- Quick Stats -->
+<!-- Enhanced Stats Cards with Real-time Updates -->
 <div class="row mb-4">
     <div class="col-md-3">
         <div class="card text-center bg-primary text-white">
             <div class="card-body">
-                <h4>{{ capas|selectattr("status", "equalto", "open")|list|length }}</h4>
-                <small>Open</small>
+                <h4 id="openCapas">{{ capas|selectattr("status", "equalto", "open")|list|length }}</h4>
+                <small>Open CAPAs</small>
+                <div class="progress mt-2" style="height: 4px;">
+                    <div class="progress-bar bg-light" style="width: {{ ((capas|selectattr('status', 'equalto', 'open')|list|length) / (capas|length) * 100) if capas|length > 0 else 0 }}%"></div>
+                </div>
             </div>
         </div>
     </div>
     <div class="col-md-3">
         <div class="card text-center bg-warning text-white">
             <div class="card-body">
-                <h4>{{ capas|selectattr("status", "equalto", "in_progress")|list|length }}</h4>
+                <h4 id="inProgressCapas">{{ capas|selectattr("status", "equalto", "in_progress")|list|length }}</h4>
                 <small>In Progress</small>
+                <div class="progress mt-2" style="height: 4px;">
+                    <div class="progress-bar bg-light" style="width: {{ ((capas|selectattr('status', 'equalto', 'in_progress')|list|length) / (capas|length) * 100) if capas|length > 0 else 0 }}%"></div>
+                </div>
             </div>
         </div>
     </div>
     <div class="col-md-3">
         <div class="card text-center bg-success text-white">
             <div class="card-body">
-                <h4>{{ capas|selectattr("status", "equalto", "completed")|list|length }}</h4>
+                <h4 id="completedCapas">{{ capas|selectattr("status", "equalto", "completed")|list|length }}</h4>
                 <small>Completed</small>
+                <div class="progress mt-2" style="height: 4px;">
+                    <div class="progress-bar bg-light" style="width: {{ ((capas|selectattr('status', 'equalto', 'completed')|list|length) / (capas|length) * 100) if capas|length > 0 else 0 }}%"></div>
+                </div>
             </div>
         </div>
     </div>
     <div class="col-md-3">
         <div class="card text-center bg-danger text-white">
             <div class="card-body">
-                <h4 id="overdueCount">-</h4>
+                <h4 id="overdueCapas">-</h4>
                 <small>Overdue</small>
+                <div class="progress mt-2" style="height: 4px;">
+                    <div class="progress-bar bg-light" id="overdueProgress" style="width: 0%"></div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Filters and Search -->
-<div class="card mb-4">
+<!-- Advanced Filters Section -->
+<div class="card mb-4" id="advancedFilters" style="display: none;">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-funnel"></i> Advanced Filters</h6>
+    </div>
     <div class="card-body">
-        <div class="row">
+        <div class="row g-3">
             <div class="col-md-3">
-                <select class="form-select" id="statusFilter">
-                    <option value="">All Statuses</option>
-                    <option value="open">Open</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="completed">Completed</option>
+                <label class="form-label">Source Type</label>
+                <select class="form-select" id="sourceFilter">
+                    <option value="">All Sources</option>
+                    <option value="incident">Incident</option>
+                    <option value="audit">Audit</option>
+                    <option value="risk">Risk Assessment</option>
+                    <option value="manual">Manual</option>
                 </select>
             </div>
             <div class="col-md-3">
-                <select class="form-select" id="priorityFilter">
-                    <option value="">All Priorities</option>
-                    <option value="critical">Critical</option>
-                    <option value="high">High</option>
-                    <option value="medium">Medium</option>
-                    <option value="low">Low</option>
+                <label class="form-label">Due Date Range</label>
+                <div class="input-group">
+                    <input type="date" class="form-control" id="dueDateFrom">
+                    <input type="date" class="form-control" id="dueDateTo">
+                </div>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Assignee</label>
+                <select class="form-select" id="assigneeFilter">
+                    <option value="">All Assignees</option>
+                    <!-- Populated dynamically -->
                 </select>
             </div>
             <div class="col-md-3">
-                <select class="form-select" id="typeFilter">
-                    <option value="">All Types</option>
-                    <option value="corrective">Corrective</option>
-                    <option value="preventive">Preventive</option>
+                <label class="form-label">Created Date</label>
+                <select class="form-select" id="createdDateFilter">
+                    <option value="">All Time</option>
+                    <option value="today">Today</option>
+                    <option value="week">This Week</option>
+                    <option value="month">This Month</option>
+                    <option value="quarter">This Quarter</option>
+                    <option value="year">This Year</option>
                 </select>
-            </div>
-            <div class="col-md-3">
-                <input type="text" class="form-control" id="searchInput" placeholder="Search CAPAs...">
             </div>
         </div>
     </div>
 </div>
 
-<!-- CAPA Table -->
-<div class="card">
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-hover" id="capaTable">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Title</th>
-                        <th>Type</th>
-                        <th>Assignee</th>
-                        <th>Due Date</th>
-                        <th>Priority</th>
-                        <th>Status</th>
-                        <th>Source</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for capa in capas %}
-                    <tr data-status="{{ capa.status }}" data-priority="{{ capa.priority }}" data-type="{{ capa.type }}">
-                        <td><code>{{ capa.id[:8] }}</code></td>
-                        <td>
-                            <strong>{{ capa.title }}</strong>
-                            {% if capa.description %}
-                            <br><small class="text-muted">{{ capa.description[:100] }}{% if capa.description|length > 100 %}...{% endif %}</small>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <span class="badge bg-{{ 'success' if capa.type == 'preventive' else 'warning' }}">
-                                {{ capa.type|title }}
-                            </span>
-                        </td>
-                        <td>{{ capa.assignee or 'Unassigned' }}</td>
-                        <td>
-                            {{ capa.due_date }}
-                            {% if capa.due_date and capa.status in ['open', 'in_progress'] %}
-                                {% set today = moment().format('YYYY-MM-DD') %}
-                                {% if capa.due_date < today %}
-                                    <br><small class="text-danger"><i class="bi bi-exclamation-triangle"></i> Overdue</small>
-                                {% endif %}
-                            {% endif %}
-                        </td>
-                        <td>
-                            <span class="badge bg-{{ 'danger' if capa.priority == 'critical' else ('warning' if capa.priority == 'high' else ('info' if capa.priority == 'medium' else 'secondary')) }}">
-                                {{ capa.priority|title }}
-                            </span>
-                        </td>
-                        <td>
-                            <span class="badge bg-{{ 'success' if capa.status == 'completed' else ('warning' if capa.status == 'in_progress' else 'secondary') }}">
-                                {{ capa.status|replace('_', ' ')|title }}
-                            </span>
-                        </td>
-                        <td>
-                            {% if capa.source != 'manual' %}
-                                <span class="badge bg-info">{{ capa.source|title }}</span>
-                                {% if capa.source_id %}
-                                    <br><small class="text-muted">{{ capa.source_id[:8] }}</small>
-                                {% endif %}
-                            {% else %}
-                                <span class="text-muted">Manual</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <div class="btn-group btn-group-sm">
-                                <a href="{{ url_for('capa.capa_detail', capa_id=capa.id) }}" class="btn btn-outline-primary" title="View Details">
-                                    <i class="bi bi-eye"></i>
-                                </a>
-                                {% if capa.status != 'completed' %}
-                                <button class="btn btn-outline-success" onclick="quickUpdate('{{ capa.id }}', 'completed')" title="Mark Complete">
-                                    <i class="bi bi-check"></i>
-                                </button>
-                                {% endif %}
-                                <div class="btn-group">
-                                    <button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
-                                        <i class="bi bi-three-dots"></i>
-                                    </button>
-                                    <ul class="dropdown-menu">
-                                        {% if capa.status == 'open' %}
-                                        <li><a class="dropdown-item" href="#" onclick="quickUpdate('{{ capa.id }}', 'in_progress')">
-                                            <i class="bi bi-play"></i> Start Progress
-                                        </a></li>
-                                        {% endif %}
-                                        <li><a class="dropdown-item" href="#" onclick="reassignCapa('{{ capa.id }}')">
-                                            <i class="bi bi-person-gear"></i> Reassign
-                                        </a></li>
-                                        <li><a class="dropdown-item" href="#" onclick="extendDueDate('{{ capa.id }}')">
-                                            <i class="bi bi-calendar-plus"></i> Extend Due Date
-                                        </a></li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        
-        {% if not capas %}
-        <div class="text-center py-5">
-            <i class="bi bi-arrow-repeat fs-1 text-muted"></i>
-            <h5 class="text-muted mt-3">No CAPAs Found</h5>
-            <p class="text-muted">Get started by creating your first CAPA.</p>
-            <a href="{{ url_for('capa.new_capa') }}" class="btn btn-primary">
-                <i class="bi bi-plus-circle"></i> Create First CAPA
-            </a>
-        </div>
-        {% endif %}
-    </div>
+<!-- Main CAPA Table -->
+<div id="capaTableContainer">
+    <!-- Dynamic table will be rendered here -->
 </div>
 
-<!-- Quick Update Modal -->
+<!-- Include the dynamic table component -->
+{% set table_id = 'capas' %}
+{% set table_title = 'CAPAs Management' %}
+{% include 'components/dynamic_table.html' %}
+
+<!-- Quick Action Modals -->
 <div class="modal fade" id="quickUpdateModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Update CAPA</h5>
+                <h5 class="modal-title">Quick Update CAPA</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form id="quickUpdateForm">
                 <div class="modal-body">
                     <div class="mb-3">
+                        <label class="form-label">New Status</label>
+                        <select class="form-select" name="status" id="quickStatus">
+                            <option value="open">Open</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="completed">Completed</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
                         <label class="form-label">Comment</label>
                         <textarea class="form-control" name="comment" rows="3" placeholder="Add a comment about this update"></textarea>
                     </div>
-                    <input type="hidden" name="capa_id" id="updateCapaId">
-                    <input type="hidden" name="status" id="updateStatus">
+                    <input type="hidden" name="capa_id" id="quickCapaId">
                     <input type="hidden" name="updated_by" value="Current User">
                 </div>
                 <div class="modal-footer">
@@ -223,92 +167,385 @@
     </div>
 </div>
 
+<div class="modal fade" id="overdueAlertModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="bi bi-exclamation-triangle"></i> Overdue CAPAs Alert</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="overdueCapasList">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-warning" onclick="sendOverdueNotifications()">
+                    <i class="bi bi-envelope"></i> Send Notifications
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
-// Table filtering functionality
 document.addEventListener('DOMContentLoaded', function() {
-    const table = document.getElementById('capaTable');
-    const statusFilter = document.getElementById('statusFilter');
-    const priorityFilter = document.getElementById('priorityFilter');
-    const typeFilter = document.getElementById('typeFilter');
-    const searchInput = document.getElementById('searchInput');
+    // CAPA data from server
+    const capasData = {{ capas|tojson }};
     
-    function filterTable() {
-        const rows = table.querySelectorAll('tbody tr');
-        const statusValue = statusFilter.value.toLowerCase();
-        const priorityValue = priorityFilter.value.toLowerCase();
-        const typeValue = typeFilter.value.toLowerCase();
-        const searchValue = searchInput.value.toLowerCase();
-        
-        let visibleCount = 0;
-        
-        rows.forEach(row => {
-            const status = row.dataset.status.toLowerCase();
-            const priority = row.dataset.priority.toLowerCase();
-            const type = row.dataset.type.toLowerCase();
-            const text = row.textContent.toLowerCase();
-            
-            const statusMatch = !statusValue || status === statusValue;
-            const priorityMatch = !priorityValue || priority === priorityValue;
-            const typeMatch = !typeValue || type === typeValue;
-            const searchMatch = !searchValue || text.includes(searchValue);
-            
-            if (statusMatch && priorityMatch && typeMatch && searchMatch) {
-                row.style.display = '';
-                visibleCount++;
-            } else {
-                row.style.display = 'none';
+    // Enhanced column configuration with custom formatting
+    const capaColumns = [
+        {
+            key: 'id',
+            label: 'CAPA ID',
+            type: 'custom',
+            filterable: true,
+            sortable: true,
+            format: (value) => `<code>${value.substring(0, 8)}</code>`
+        },
+        {
+            key: 'title',
+            label: 'Title',
+            type: 'custom',
+            filterable: true,
+            sortable: true,
+            format: (value, row) => {
+                const truncated = value.length > 50 ? value.substring(0, 50) + '...' : value;
+                return `
+                    <div>
+                        <strong>${truncated}</strong>
+                        ${row.description ? `<br><small class="text-muted">${row.description.substring(0, 80)}${row.description.length > 80 ? '...' : ''}</small>` : ''}
+                    </div>
+                `;
             }
-        });
-        
-        // Show/hide "no results" message
-        const noResults = document.getElementById('noResults');
-        if (visibleCount === 0 && rows.length > 0) {
-            if (!noResults) {
-                const tbody = table.querySelector('tbody');
-                tbody.insertAdjacentHTML('beforeend', `
-                    <tr id="noResults">
-                        <td colspan="9" class="text-center py-4 text-muted">
-                            <i class="bi bi-search"></i> No CAPAs match your filters
-                        </td>
-                    </tr>
-                `);
+        },
+        {
+            key: 'type',
+            label: 'Type',
+            type: 'badge',
+            filterable: true,
+            sortable: true,
+            badgeMap: {
+                'corrective': 'warning',
+                'preventive': 'success'
             }
-        } else if (noResults) {
-            noResults.remove();
+        },
+        {
+            key: 'assignee',
+            label: 'Assignee',
+            type: 'custom',
+            filterable: true,
+            sortable: true,
+            format: (value) => value || '<span class="text-muted">Unassigned</span>'
+        },
+        {
+            key: 'due_date',
+            label: 'Due Date',
+            type: 'custom',
+            filterable: true,
+            sortable: true,
+            format: (value, row) => {
+                if (!value) return '<span class="text-muted">No due date</span>';
+                
+                const dueDate = new Date(value);
+                const today = new Date();
+                const isOverdue = dueDate < today && ['open', 'in_progress'].includes(row.status);
+                const daysDiff = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+                
+                let badge = '';
+                if (isOverdue) {
+                    badge = `<br><small class="badge bg-danger">Overdue ${Math.abs(daysDiff)} days</small>`;
+                } else if (daysDiff <= 7 && daysDiff > 0) {
+                    badge = `<br><small class="badge bg-warning">Due in ${daysDiff} days</small>`;
+                }
+                
+                return `${dueDate.toLocaleDateString()}${badge}`;
+            }
+        },
+        {
+            key: 'priority',
+            label: 'Priority',
+            type: 'badge',
+            filterable: true,
+            sortable: true,
+            badgeMap: {
+                'critical': 'danger',
+                'high': 'warning',
+                'medium': 'info',
+                'low': 'secondary'
+            }
+        },
+        {
+            key: 'status',
+            label: 'Status',
+            type: 'badge',
+            filterable: true,
+            sortable: true,
+            badgeMap: {
+                'completed': 'success',
+                'in_progress': 'warning',
+                'open': 'secondary'
+            }
+        },
+        {
+            key: 'source',
+            label: 'Source',
+            type: 'custom',
+            filterable: true,
+            sortable: true,
+            format: (value, row) => {
+                if (value !== 'manual') {
+                    return `
+                        <div>
+                            <span class="badge bg-info">${value.charAt(0).toUpperCase() + value.slice(1)}</span>
+                            ${row.source_id ? `<br><small class="text-muted">${row.source_id.substring(0, 8)}</small>` : ''}
+                        </div>
+                    `;
+                }
+                return '<span class="text-muted">Manual</span>';
+            }
+        },
+        {
+            key: 'created_date',
+            label: 'Created',
+            type: 'date',
+            filterable: true,
+            sortable: true
+        },
+        {
+            key: 'actions',
+            label: 'Actions',
+            type: 'custom',
+            filterable: false,
+            sortable: false,
+            format: (value, row) => `
+                <div class="btn-group btn-group-sm">
+                    <a href="/capa/${row.id}" class="btn btn-outline-primary" title="View Details">
+                        <i class="bi bi-eye"></i>
+                    </a>
+                    ${row.status !== 'completed' ? `
+                        <button class="btn btn-outline-success" onclick="quickUpdate('${row.id}', 'completed')" title="Mark Complete">
+                            <i class="bi bi-check"></i>
+                        </button>
+                    ` : ''}
+                    <div class="btn-group">
+                        <button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                            <i class="bi bi-three-dots"></i>
+                        </button>
+                        <ul class="dropdown-menu">
+                            ${row.status === 'open' ? `
+                                <li><a class="dropdown-item" href="#" onclick="quickUpdate('${row.id}', 'in_progress')">
+                                    <i class="bi bi-play"></i> Start Progress
+                                </a></li>
+                            ` : ''}
+                            <li><a class="dropdown-item" href="#" onclick="reassignCapa('${row.id}')">
+                                <i class="bi bi-person-gear"></i> Reassign
+                            </a></li>
+                            <li><a class="dropdown-item" href="#" onclick="extendDueDate('${row.id}')">
+                                <i class="bi bi-calendar-plus"></i> Extend Due Date
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" onclick="duplicateCapa('${row.id}')">
+                                <i class="bi bi-copy"></i> Duplicate
+                            </a></li>
+                        </ul>
+                    </div>
+                </div>
+            `
         }
-    }
+    ];
     
-    statusFilter.addEventListener('change', filterTable);
-    priorityFilter.addEventListener('change', filterTable);
-    typeFilter.addEventListener('change', filterTable);
-    searchInput.addEventListener('input', filterTable);
+    // Initialize the dynamic table
+    const table = initTable('capas', capasData, capaColumns, {
+        sortable: true,
+        filterable: true,
+        paginated: true,
+        exportable: true,
+        persistPreferences: true,
+        defaultSort: { column: 'due_date', direction: 'asc' }
+    });
     
-    // Load overdue count
+    // Load overdue count from API
+    loadCapaStats();
+    
+    // Setup advanced filters
+    setupAdvancedFilters();
+    
+    // Setup auto-refresh for real-time updates
+    setInterval(loadCapaStats, 300000); // Refresh every 5 minutes
+    
+    // Setup assignee filter options
+    populateAssigneeFilter();
+});
+
+function loadCapaStats() {
     fetch('/capa/api/stats')
         .then(response => response.json())
         .then(data => {
-            document.getElementById('overdueCount').textContent = data.overdue || 0;
+            document.getElementById('overdueCapas').textContent = data.overdue || 0;
+            
+            // Update progress bar
+            const total = data.total || 1;
+            const overduePercent = ((data.overdue || 0) / total) * 100;
+            document.getElementById('overdueProgress').style.width = overduePercent + '%';
+            
+            // Update other stats if available
+            if (data.open !== undefined) {
+                document.getElementById('openCapas').textContent = data.open;
+            }
+            if (data.in_progress !== undefined) {
+                document.getElementById('inProgressCapas').textContent = data.in_progress;
+            }
+            if (data.completed !== undefined) {
+                document.getElementById('completedCapas').textContent = data.completed;
+            }
         })
         .catch(error => {
             console.error('Error loading CAPA stats:', error);
-            document.getElementById('overdueCount').textContent = '?';
+            document.getElementById('overdueCapas').textContent = '?';
         });
-});
+}
 
+function setupAdvancedFilters() {
+    // Add event listeners for advanced filters
+    ['sourceFilter', 'dueDateFrom', 'dueDateTo', 'assigneeFilter', 'createdDateFilter'].forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.addEventListener('change', applyAdvancedFilters);
+        }
+    });
+}
+
+function populateAssigneeFilter() {
+    const assignees = [...new Set(capasData.map(capa => capa.assignee).filter(Boolean))];
+    const select = document.getElementById('assigneeFilter');
+    
+    assignees.forEach(assignee => {
+        const option = document.createElement('option');
+        option.value = assignee;
+        option.textContent = assignee;
+        select.appendChild(option);
+    });
+}
+
+function applyAdvancedFilters() {
+    const table = tableInstances['capas'];
+    if (!table) return;
+    
+    const sourceFilter = document.getElementById('sourceFilter').value;
+    const dueDateFrom = document.getElementById('dueDateFrom').value;
+    const dueDateTo = document.getElementById('dueDateTo').value;
+    const assigneeFilter = document.getElementById('assigneeFilter').value;
+    const createdDateFilter = document.getElementById('createdDateFilter').value;
+    
+    let filteredData = [...table.data];
+    
+    // Apply source filter
+    if (sourceFilter) {
+        filteredData = filteredData.filter(item => item.source === sourceFilter);
+    }
+    
+    // Apply assignee filter
+    if (assigneeFilter) {
+        filteredData = filteredData.filter(item => item.assignee === assigneeFilter);
+    }
+    
+    // Apply due date range filter
+    if (dueDateFrom || dueDateTo) {
+        filteredData = filteredData.filter(item => {
+            if (!item.due_date) return false;
+            const dueDate = new Date(item.due_date);
+            const fromDate = dueDateFrom ? new Date(dueDateFrom) : new Date('1900-01-01');
+            const toDate = dueDateTo ? new Date(dueDateTo) : new Date('2100-01-01');
+            return dueDate >= fromDate && dueDate <= toDate;
+        });
+    }
+    
+    // Apply created date filter
+    if (createdDateFilter) {
+        const now = new Date();
+        let cutoffDate = new Date();
+        
+        switch (createdDateFilter) {
+            case 'today':
+                cutoffDate.setHours(0, 0, 0, 0);
+                break;
+            case 'week':
+                cutoffDate.setDate(now.getDate() - 7);
+                break;
+            case 'month':
+                cutoffDate.setMonth(now.getMonth() - 1);
+                break;
+            case 'quarter':
+                cutoffDate.setMonth(now.getMonth() - 3);
+                break;
+            case 'year':
+                cutoffDate.setFullYear(now.getFullYear() - 1);
+                break;
+        }
+        
+        filteredData = filteredData.filter(item => {
+            const createdDate = new Date(item.created_date);
+            return createdDate >= cutoffDate;
+        });
+    }
+    
+    table.filteredData = filteredData;
+    table.currentPage = 1;
+    table.render();
+}
+
+function toggleAdvancedFilters() {
+    const panel = document.getElementById('advancedFilters');
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+// Quick Actions
 function quickUpdate(capaId, status) {
-    document.getElementById('updateCapaId').value = capaId;
-    document.getElementById('updateStatus').value = status;
+    document.getElementById('quickCapaId').value = capaId;
+    document.getElementById('quickStatus').value = status;
     
     const modal = new bootstrap.Modal(document.getElementById('quickUpdateModal'));
     modal.show();
 }
 
-// Handle quick update form submission
-document.getElementById('quickUpdateForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    const formData = new FormData(this);
-    const capaId = formData.get('capa_id');
+function reassignCapa(capaId) {
+    const newAssignee = prompt('Enter new assignee name:');
+    if (newAssignee) {
+        updateCapa(capaId, {
+            assignee: newAssignee,
+            comment: `Reassigned to ${newAssignee}`,
+            updated_by: 'Current User'
+        });
+    }
+}
+
+function extendDueDate(capaId) {
+    const newDueDate = prompt('Enter new due date (YYYY-MM-DD):');
+    if (newDueDate && /^\d{4}-\d{2}-\d{2}$/.test(newDueDate)) {
+        updateCapa(capaId, {
+            due_date: newDueDate,
+            comment: `Due date extended to ${newDueDate}`,
+            updated_by: 'Current User'
+        });
+    } else if (newDueDate) {
+        alert('Please enter a valid date in YYYY-MM-DD format');
+    }
+}
+
+function duplicateCapa(capaId) {
+    if (confirm('Create a duplicate of this CAPA?')) {
+        // Implementation for duplicating CAPA
+        console.log('Duplicating CAPA:', capaId);
+    }
+}
+
+function updateCapa(capaId, data) {
+    const formData = new FormData();
+    Object.keys(data).forEach(key => {
+        formData.append(key, data[key]);
+    });
     
     fetch(`/capa/${capaId}/update`, {
         method: 'POST',
@@ -325,979 +562,138 @@ document.getElementById('quickUpdateForm').addEventListener('submit', function(e
         console.error('Error:', error);
         alert('Error updating CAPA');
     });
+}
+
+// Handle quick update form submission
+document.getElementById('quickUpdateForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const capaId = formData.get('capa_id');
+    
+    updateCapa(capaId, Object.fromEntries(formData));
 });
 
-function reassignCapa(capaId) {
-    const newAssignee = prompt('Enter new assignee name:');
-    if (newAssignee) {
-        const formData = new FormData();
-        formData.append('assignee', newAssignee);
-        formData.append('comment', `Reassigned to ${newAssignee}`);
-        formData.append('updated_by', 'Current User');
-        
-        fetch(`/capa/${capaId}/update`, {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => {
-            if (response.ok) {
-                location.reload();
-            } else {
-                alert('Error reassigning CAPA');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error reassigning CAPA');
-        });
-    }
+// Overdue Alert System
+function showOverdueAlert() {
+    loadOverdueCapas();
+    const modal = new bootstrap.Modal(document.getElementById('overdueAlertModal'));
+    modal.show();
 }
 
-function extendDueDate(capaId) {
-    const newDueDate = prompt('Enter new due date (YYYY-MM-DD):');
-    if (newDueDate && /^\d{4}-\d{2}-\d{2}$/.test(newDueDate)) {
-        const formData = new FormData();
-        formData.append('due_date', newDueDate);
-        formData.append('comment', `Due date extended to ${newDueDate}`);
-        formData.append('updated_by', 'Current User');
-        
-        fetch(`/capa/${capaId}/update`, {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => {
-            if (response.ok) {
-                location.reload();
-            } else {
-                alert('Error extending due date');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error extending due date');
-        });
-    } else if (newDueDate) {
-        alert('Please enter a valid date in YYYY-MM-DD format');
+function loadOverdueCapas() {
+    const today = new Date();
+    const overdueCapas = capasData.filter(capa => {
+        if (!capa.due_date || capa.status === 'completed') return false;
+        const dueDate = new Date(capa.due_date);
+        return dueDate < today;
+    });
+    
+    const container = document.getElementById('overdueCapasList');
+    
+    if (overdueCapas.length === 0) {
+        container.innerHTML = '<div class="alert alert-success">No overdue CAPAs found!</div>';
+        return;
     }
-}
-
-// Auto-refresh every 5 minutes to show updated SLA status
-setInterval(function() {
-    const overdueCountElement = document.getElementById('overdueCount');
-    fetch('/capa/api/stats')
-        .then(response => response.json())
-        .then(data => {
-            const currentCount = overdueCountElement.textContent;
-            const newCount = data.overdue || 0;
-            
-            if (currentCount !== newCount.toString()) {
-                overdueCountElement.textContent = newCount;
-                // Highlight if count increased
-                if (newCount > parseInt(currentCount) || 0) {
-                    overdueCountElement.parentElement.classList.add('animate__animated', 'animate__pulse');
-                    setTimeout(() => {
-                        overdueCountElement.parentElement.classList.remove('animate__animated', 'animate__pulse');
-                    }, 1000);
-                }
-            }
-        })
-        .catch(error => console.error('Error refreshing stats:', error));
-}, 300000); // 5 minutes
-</script>
-{% endblock %}
-
-<!-- templates/capa_detail.html - CAPA Detail View -->
-{% extends "base.html" %}
-{% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-        <h3><i class="bi bi-arrow-repeat text-primary"></i> CAPA Details</h3>
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{{ url_for('capa.capa_list') }}">CAPAs</a></li>
-                <li class="breadcrumb-item active">{{ capa.id[:8] }}</li>
-            </ol>
-        </nav>
-    </div>
-    <div>
-        <span class="badge bg-{{ 'success' if capa.status == 'completed' else ('warning' if capa.status == 'in_progress' else 'secondary') }} fs-6">
-            {{ capa.status|replace('_', ' ')|title }}
-        </span>
-    </div>
-</div>
-
-<div class="row">
-    <div class="col-md-8">
-        <!-- CAPA Information -->
-        <div class="card shadow mb-4">
-            <div class="card-header bg-primary text-white">
-                <h6 class="mb-0"><i class="bi bi-info-circle"></i> CAPA Information</h6>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-6">
-                        <p><strong>ID:</strong> <code>{{ capa.id }}</code></p>
-                        <p><strong>Title:</strong> {{ capa.title }}</p>
-                        <p><strong>Type:</strong> 
-                            <span class="badge bg-{{ 'success' if capa.type == 'preventive' else 'warning' }}">
-                                {{ capa.type|title }}
-                            </span>
-                        </p>
-                        <p><strong>Priority:</strong> 
-                            <span class="badge bg-{{ 'danger' if capa.priority == 'critical' else ('warning' if capa.priority == 'high' else ('info' if capa.priority == 'medium' else 'secondary')) }}">
-                                {{ capa.priority|title }}
-                            </span>
-                        </p>
-                    </div>
-                    <div class="col-md-6">
-                        <p><strong>Assignee:</strong> {{ capa.assignee or 'Unassigned' }}</p>
-                        <p><strong>Due Date:</strong> 
-                            {{ capa.due_date }}
-                            {% if capa.due_date and capa.status in ['open', 'in_progress'] %}
-                                {% set today = moment().format('YYYY-MM-DD') %}
-                                {% if capa.due_date < today %}
-                                    <span class="text-danger ms-2"><i class="bi bi-exclamation-triangle"></i> Overdue</span>
-                                {% endif %}
-                            {% endif %}
-                        </p>
-                        <p><strong>Created:</strong> {{ moment(capa.created_date).format('YYYY-MM-DD HH:mm') }}</p>
-                        <p><strong>Created By:</strong> {{ capa.created_by }}</p>
-                    </div>
-                </div>
-                
-                {% if capa.description %}
-                <hr>
-                <h6>Description</h6>
-                <p>{{ capa.description }}</p>
-                {% endif %}
-                
-                {% if capa.root_cause %}
-                <hr>
-                <h6>Root Cause</h6>
-                <p>{{ capa.root_cause }}</p>
-                {% endif %}
-                
-                {% if capa.implementation_plan %}
-                <hr>
-                <h6>Implementation Plan</h6>
-                <p>{{ capa.implementation_plan }}</p>
-                {% endif %}
-            </div>
-        </div>
-
-        <!-- Source Information -->
-        {% if capa.source and capa.source != 'manual' %}
-        <div class="card shadow mb-4">
-            <div class="card-header bg-info text-white">
-                <h6 class="mb-0"><i class="bi bi-link"></i> Source Information</h6>
-            </div>
-            <div class="card-body">
-                <p><strong>Source Type:</strong> {{ capa.source|title }}</p>
-                {% if capa.source_id %}
-                <p><strong>Source ID:</strong> <code>{{ capa.source_id }}</code></p>
-                {% endif %}
-                <a href="/{{ capa.source }}/{{ capa.source_id }}" class="btn btn-outline-info btn-sm">
-                    <i class="bi bi-external-link"></i> View Source
-                </a>
-            </div>
-        </div>
-        {% endif %}
-
-        <!-- Update History -->
-        {% if capa.updates %}
-        <div class="card shadow mb-4">
-            <div class="card-header">
-                <h6 class="mb-0"><i class="bi bi-clock-history"></i> Update History</h6>
-            </div>
-            <div class="card-body">
-                <div class="timeline">
-                    {% for update in capa.updates|reverse %}
-                    <div class="timeline-item">
-                        <div class="timeline-marker"></div>
-                        <div class="timeline-content">
-                            <div class="d-flex justify-content-between align-items-start">
-                                <div>
-                                    <h6 class="mb-1">
-                                        {% if update.status_change %}
-                                            Status changed from "{{ update.old_status|replace('_', ' ')|title }}" to "{{ update.new_status|replace('_', ' ')|title }}"
-                                        {% else %}
-                                            CAPA Updated
-                                        {% endif %}
-                                    </h6>
-                                    {% if update.comment %}
-                                    <p class="mb-1">{{ update.comment }}</p>
-                                    {% endif %}
-                                    {% if update.fields_changed %}
-                                    <small class="text-muted">
-                                        Fields changed: {{ update.fields_changed|map(attribute='field')|join(', ') }}
-                                    </small>
-                                    {% endif %}
-                                </div>
-                                <small class="text-muted">{{ moment(update.timestamp).fromNow() }}</small>
+    
+    container.innerHTML = overdueCapas.map(capa => {
+        const daysPast = Math.ceil((today - new Date(capa.due_date)) / (1000 * 60 * 60 * 24));
+        return `
+            <div class="card mb-2">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="mb-1">${capa.title}</h6>
+                            <p class="mb-1 text-muted small">${capa.description || 'No description'}</p>
+                            <div>
+                                <span class="badge bg-${capa.priority === 'critical' ? 'danger' : 'warning'}">${capa.priority}</span>
+                                <span class="badge bg-secondary">${capa.assignee || 'Unassigned'}</span>
                             </div>
-                            <small class="text-muted">By: {{ update.user }}</small>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge bg-danger">${daysPast} days overdue</span>
+                            <br><small class="text-muted">Due: ${new Date(capa.due_date).toLocaleDateString()}</small>
                         </div>
                     </div>
-                    {% endfor %}
                 </div>
             </div>
-        </div>
-        {% endif %}
-    </div>
+        `;
+    }).join('');
+}
 
-    <div class="col-md-4">
-        <!-- Quick Actions -->
-        <div class="card shadow mb-4">
-            <div class="card-header">
-                <h6 class="mb-0"><i class="bi bi-lightning"></i> Quick Actions</h6>
-            </div>
-            <div class="card-body">
-                <div class="d-grid gap-2">
-                    {% if capa.status == 'open' %}
-                    <button class="btn btn-warning" onclick="updateStatus('in_progress')">
-                        <i class="bi bi-play"></i> Start Progress
-                    </button>
-                    {% endif %}
-                    
-                    {% if capa.status in ['open', 'in_progress'] %}
-                    <button class="btn btn-success" onclick="updateStatus('completed')">
-                        <i class="bi bi-check-circle"></i> Mark Complete
-                    </button>
-                    {% endif %}
-                    
-                    <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#updateModal">
-                        <i class="bi bi-pencil"></i> Add Update
-                    </button>
-                    
-                    <a href="{{ url_for('capa.capa_list') }}" class="btn btn-outline-secondary">
-                        <i class="bi bi-arrow-left"></i> Back to List
-                    </a>
-                </div>
-            </div>
-        </div>
+function sendOverdueNotifications() {
+    // Implementation for sending notifications
+    alert('Overdue notifications would be sent to assignees and managers.');
+    bootstrap.Modal.getInstance(document.getElementById('overdueAlertModal')).hide();
+}
 
-        <!-- CAPA Metrics -->
-        <div class="card shadow">
-            <div class="card-header">
-                <h6 class="mb-0"><i class="bi bi-graph-up"></i> Metrics</h6>
-            </div>
-            <div class="card-body">
-                {% set created_date = moment(capa.created_date) %}
-                {% set due_date = moment(capa.due_date) if capa.due_date else None %}
-                {% set completion_date = moment(capa.completion_date) if capa.completion_date else None %}
-                
-                <div class="metric-item mb-3">
-                    <label class="form-label">Age</label>
-                    <div class="metric-value">{{ created_date.fromNow() }}</div>
-                </div>
-                
-                {% if due_date %}
-                <div class="metric-item mb-3">
-                    <label class="form-label">Time to Due Date</label>
-                    <div class="metric-value">
-                        {% if capa.status == 'completed' and completion_date %}
-                            Completed {{ due_date.diff(completion_date, 'days') }} days {{ 'early' if due_date.isAfter(completion_date) else 'late' }}
-                        {% else %}
-                            {{ due_date.fromNow() }}
-                        {% endif %}
-                    </div>
-                </div>
-                {% endif %}
-                
-                <div class="metric-item mb-3">
-                    <label class="form-label">Updates</label>
-                    <div class="metric-value">{{ capa.updates|length }} updates</div>
-                </div>
-                
-                {% if completion_date %}
-                <div class="metric-item">
-                    <label class="form-label">Completion Time</label>
-                    <div class="metric-value">{{ completion_date.diff(created_date, 'days') }} days</div>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</div>
+function bulkAssign() {
+    // Implementation for bulk assignment
+    alert('Bulk assignment feature would be implemented here.');
+}
 
-<!-- Update Modal -->
-<div class="modal fade" id="updateModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Update CAPA</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <form method="post" action="{{ url_for('capa.update_capa', capa_id=capa.id) }}">
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label">Status</label>
-                        <select class="form-select" name="status">
-                            <option value="open" {{ 'selected' if capa.status == 'open' }}>Open</option>
-                            <option value="in_progress" {{ 'selected' if capa.status == 'in_progress' }}>In Progress</option>
-                            <option value="completed" {{ 'selected' if capa.status == 'completed' }}>Completed</option>
-                        </select>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Assignee</label>
-                        <input type="text" class="form-control" name="assignee" value="{{ capa.assignee }}">
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Due Date</label>
-                        <input type="date" class="form-control" name="due_date" value="{{ capa.due_date }}">
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Priority</label>
-                        <select class="form-select" name="priority">
-                            <option value="low" {{ 'selected' if capa.priority == 'low' }}>Low</option>
-                            <option value="medium" {{ 'selected' if capa.priority == 'medium' }}>Medium</option>
-                            <option value="high" {{ 'selected' if capa.priority == 'high' }}>High</option>
-                            <option value="critical" {{ 'selected' if capa.priority == 'critical' }}>Critical</option>
-                        </select>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Comment <span class="text-danger">*</span></label>
-                        <textarea class="form-control" name="comment" rows="3" placeholder="Describe the update or changes made" required></textarea>
-                    </div>
-                    
-                    <input type="hidden" name="updated_by" value="Current User">
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Update CAPA</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
+// Global functions for table interactions
+window.quickUpdate = quickUpdate;
+window.reassignCapa = reassignCapa;
+window.extendDueDate = extendDueDate;
+window.duplicateCapa = duplicateCapa;
+</script>
 
 <style>
-.timeline {
-    position: relative;
-    padding-left: 2rem;
-}
-
-.timeline::before {
-    content: '';
-    position: absolute;
-    left: 0.5rem;
-    top: 0;
-    bottom: 0;
-    width: 2px;
-    background: #e2e8f0;
-}
-
-.timeline-item {
-    position: relative;
-    margin-bottom: 1.5rem;
-}
-
-.timeline-marker {
-    position: absolute;
-    left: -2rem;
-    top: 0.25rem;
-    width: 1rem;
-    height: 1rem;
-    background: #3b82f6;
-    border: 2px solid white;
-    border-radius: 50%;
-    box-shadow: 0 0 0 2px #e2e8f0;
-}
-
-.timeline-content {
-    background: #f8fafc;
-    padding: 1rem;
-    border-radius: 8px;
-    border: 1px solid #e2e8f0;
-}
-
-.metric-item {
-    border-bottom: 1px solid #f1f5f9;
-    padding-bottom: 0.5rem;
-}
-
-.metric-item:last-child {
-    border-bottom: none;
-    padding-bottom: 0;
-}
-
-.metric-value {
+.card h4 {
+    font-size: 1.5rem;
     font-weight: 600;
-    color: #1e293b;
+}
+
+.card small {
+    font-size: 0.875rem;
+    opacity: 0.9;
+}
+
+.progress {
+    background-color: rgba(255, 255, 255, 0.3) !important;
+}
+
+.progress-bar {
+    background-color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.badge {
+    font-size: 0.75rem;
+}
+
+.btn-group-sm .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(0, 0, 0, 0.025);
+}
+
+.dropdown-menu {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+#overdueCapasList .card {
+    border-left: 4px solid #dc3545;
+}
+
+@media (max-width: 768px) {
+    .btn-group {
+        flex-direction: column;
+        width: 100%;
+    }
+    
+    .btn-group .btn {
+        border-radius: 0.375rem !important;
+        margin-bottom: 0.25rem;
+    }
+    
+    .card h4 {
+        font-size: 1.25rem;
+    }
 }
 </style>
-
-<script>
-function updateStatus(status) {
-    const comment = prompt(`Add a comment for marking as ${status.replace('_', ' ')}:`);
-    if (comment !== null) {
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '{{ url_for("capa.update_capa", capa_id=capa.id) }}';
-        
-        const statusInput = document.createElement('input');
-        statusInput.type = 'hidden';
-        statusInput.name = 'status';
-        statusInput.value = status;
-        
-        const commentInput = document.createElement('input');
-        commentInput.type = 'hidden';
-        commentInput.name = 'comment';
-        commentInput.value = comment || `Status changed to ${status.replace('_', ' ')}`;
-        
-        const userInput = document.createElement('input');
-        userInput.type = 'hidden';
-        userInput.name = 'updated_by';
-        userInput.value = 'Current User';
-        
-        form.appendChild(statusInput);
-        form.appendChild(commentInput);
-        form.appendChild(userInput);
-        
-        document.body.appendChild(form);
-        form.submit();
-    }
-}
-</script>
-{% endblock %}
-
-<!-- templates/capa_new.html - New CAPA Form -->
-{% extends "base.html" %}
-{% block content %}
-<div class="container-fluid">
-    <h3 class="mb-4">
-        <i class="bi bi-plus-circle text-primary"></i> Create New CAPA
-    </h3>
-
-    <div class="row">
-        <div class="col-md-8">
-            <form method="post" class="card shadow">
-                <div class="card-header bg-primary text-white">
-                    <h6 class="mb-0">CAPA Details</h6>
-                </div>
-                <div class="card-body">
-                    {% if source and source_id %}
-                    <div class="alert alert-info">
-                        <i class="bi bi-info-circle"></i>
-                        This CAPA is being created from {{ source|title }} ID: <code>{{ source_id }}</code>
-                    </div>
-                    <input type="hidden" name="source" value="{{ source }}">
-                    <input type="hidden" name="source_id" value="{{ source_id }}">
-                    {% endif %}
-
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">Title <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" name="title" required 
-                                       placeholder="Brief description of the CAPA">
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">Type <span class="text-danger">*</span></label>
-                                <select class="form-select" name="type" required>
-                                    <option value="">Select CAPA type</option>
-                                    <option value="corrective">Corrective Action (fix current problem)</option>
-                                    <option value="preventive">Preventive Action (prevent future problems)</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Description <span class="text-danger">*</span></label>
-                        <textarea class="form-control" name="description" rows="4" required
-                                  placeholder="Detailed description of the problem and proposed action"></textarea>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Root Cause Analysis</label>
-                        <textarea class="form-control" name="root_cause" rows="3"
-                                  placeholder="Identify the underlying cause(s) of the issue"></textarea>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Implementation Plan</label>
-                        <textarea class="form-control" name="implementation_plan" rows="3"
-                                  placeholder="Step-by-step plan for implementing the corrective/preventive action"></textarea>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">Assignee <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" name="assignee" required
-                                       placeholder="Person responsible for implementation">
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">Due Date <span class="text-danger">*</span></label>
-                                <input type="date" class="form-control" name="due_date" required
-                                       min="{{ moment().format('YYYY-MM-DD') }}">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">Priority <span class="text-danger">*</span></label>
-                                <select class="form-select" name="priority" required>
-                                    <option value="">Select priority level</option>
-                                    <option value="low">Low (Non-critical, routine improvement)</option>
-                                    <option value="medium" selected>Medium (Important, moderate impact)</option>
-                                    <option value="high">High (Significant impact, urgent)</option>
-                                    <option value="critical">Critical (Safety/regulatory concern)</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">Risk Level</label>
-                                <select class="form-select" name="risk_level">
-                                    <option value="low">Low Risk</option>
-                                    <option value="medium" selected>Medium Risk</option>
-                                    <option value="high">High Risk</option>
-                                    <option value="critical">Critical Risk</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Created By</label>
-                        <input type="text" class="form-control" name="created_by" value="Current User">
-                    </div>
-                </div>
-
-                <div class="card-footer">
-                    <div class="d-flex justify-content-between">
-                        <a href="{{ url_for('capa.capa_list') }}" class="btn btn-secondary">
-                            <i class="bi bi-arrow-left"></i> Cancel
-                        </a>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-plus-circle"></i> Create CAPA
-                        </button>
-                    </div>
-                </div>
-            </form>
-        </div>
-
-        <div class="col-md-4">
-            <!-- CAPA Guidelines -->
-            <div class="card shadow mb-4">
-                <div class="card-header bg-info text-white">
-                    <h6 class="mb-0"><i class="bi bi-lightbulb"></i> CAPA Guidelines</h6>
-                </div>
-                <div class="card-body">
-                    <h6>Corrective Actions</h6>
-                    <ul class="small mb-3">
-                        <li>Address existing problems or non-conformances</li>
-                        <li>Fix immediate issues</li>
-                        <li>Restore normal operations</li>
-                        <li>Target specific incidents or findings</li>
-                    </ul>
-
-                    <h6>Preventive Actions</h6>
-                    <ul class="small mb-3">
-                        <li>Prevent potential future problems</li>
-                        <li>Address systemic issues</li>
-                        <li>Improve processes and procedures</li>
-                        <li>Based on trend analysis or risk assessment</li>
-                    </ul>
-
-                    <h6>Priority Guidelines</h6>
-                    <ul class="small mb-0">
-                        <li><strong>Critical:</strong> Safety or regulatory issues</li>
-                        <li><strong>High:</strong> Significant operational impact</li>
-                        <li><strong>Medium:</strong> Moderate impact, standard timeline</li>
-                        <li><strong>Low:</strong> Minor improvements, flexible timeline</li>
-                    </ul>
-                </div>
-            </div>
-
-            <!-- Recent Related Items -->
-            <div class="card shadow">
-                <div class="card-header">
-                    <h6 class="mb-0"><i class="bi bi-clock-history"></i> Recent Activity</h6>
-                </div>
-                <div class="card-body">
-                    <p class="small text-muted">Recent incidents and risk assessments that may benefit from CAPAs:</p>
-                    
-                    <div class="recent-items" id="recentItems">
-                        <div class="text-center py-3">
-                            <div class="spinner-border spinner-border-sm text-muted"></div>
-                            <p class="small text-muted mt-2">Loading recent items...</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-// Set default due date to 30 days from now
-document.addEventListener('DOMContentLoaded', function() {
-    const dueDateInput = document.querySelector('input[name="due_date"]');
-    const prioritySelect = document.querySelector('select[name="priority"]');
-    
-    // Set default due date based on priority
-    function updateDueDate() {
-        const priority = prioritySelect.value;
-        const today = new Date();
-        let days;
-        
-        switch(priority) {
-            case 'critical': days = 7; break;
-            case 'high': days = 14; break;
-            case 'medium': days = 30; break;
-            case 'low': days = 60; break;
-            default: days = 30;
-        }
-        
-        const dueDate = new Date(today.getTime() + (days * 24 * 60 * 60 * 1000));
-        dueDateInput.value = dueDate.toISOString().split('T')[0];
-    }
-    
-    prioritySelect.addEventListener('change', updateDueDate);
-    updateDueDate(); // Set initial value
-    
-    // Load recent items for reference
-    loadRecentItems();
-});
-
-function loadRecentItems() {
-    fetch('/api/recent-activity')
-        .then(response => response.json())
-        .then(data => {
-            const container = document.getElementById('recentItems');
-            
-            if (data.activities && data.activities.length > 0) {
-                container.innerHTML = data.activities.slice(0, 5).map(item => `
-                    <div class="small mb-2 p-2 bg-light rounded">
-                        <strong>${item.type}:</strong> ${item.description}
-                        <br><small class="text-muted">${item.time_ago}</small>
-                        ${item.url ? `<br><a href="${item.url}" class="small">View Details</a>` : ''}
-                    </div>
-                `).join('');
-            } else {
-                container.innerHTML = '<p class="small text-muted">No recent activity found.</p>';
-            }
-        })
-        .catch(error => {
-            console.error('Error loading recent items:', error);
-            document.getElementById('recentItems').innerHTML = 
-                '<p class="small text-muted">Unable to load recent items.</p>';
-        });
-}
-
-// Form validation
-document.querySelector('form').addEventListener('submit', function(e) {
-    const title = document.querySelector('input[name="title"]').value.trim();
-    const description = document.querySelector('textarea[name="description"]').value.trim();
-    const assignee = document.querySelector('input[name="assignee"]').value.trim();
-    const dueDate = document.querySelector('input[name="due_date"]').value;
-    const priority = document.querySelector('select[name="priority"]').value;
-    const type = document.querySelector('select[name="type"]').value;
-    
-    if (!title || !description || !assignee || !dueDate || !priority || !type) {
-        e.preventDefault();
-        alert('Please fill in all required fields.');
-        return;
-    }
-    
-    // Check if due date is in the future
-    const today = new Date().toISOString().split('T')[0];
-    if (dueDate < today) {
-        e.preventDefault();
-        alert('Due date must be in the future.');
-        return;
-    }
-    
-    // Confirm creation
-    if (!confirm('Create this CAPA? The assignee will be notified.')) {
-        e.preventDefault();
-    }
-});
-</script>
-{% endblock %}
-
-<!-- templates/capa_dashboard.html - CAPA Analytics Dashboard -->
-{% extends "base.html" %}
-{% block content %}
-<h3 class="mb-4">
-    <i class="bi bi-graph-up text-primary"></i> CAPA Dashboard
-</h3>
-
-<!-- Summary Cards -->
-<div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card text-center bg-primary text-white">
-            <div class="card-body">
-                <h3>{{ stats.total }}</h3>
-                <p class="mb-0">Total CAPAs</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-center bg-warning text-white">
-            <div class="card-body">
-                <h3>{{ stats.open + stats.in_progress }}</h3>
-                <p class="mb-0">Active CAPAs</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-center bg-danger text-white">
-            <div class="card-body">
-                <h3>{{ stats.overdue }}</h3>
-                <p class="mb-0">Overdue CAPAs</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-center bg-success text-white">
-            <div class="card-body">
-                <h3>{{ ((stats.completed / stats.total) * 100)|round|int if stats.total > 0 else 0 }}%</h3>
-                <p class="mb-0">Completion Rate</p>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Charts Row -->
-<div class="row mb-4">
-    <div class="col-md-6">
-        <div class="card shadow">
-            <div class="card-header">
-                <h6><i class="bi bi-pie-chart"></i> CAPAs by Priority</h6>
-            </div>
-            <div class="card-body">
-                <canvas id="priorityChart" height="300"></canvas>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-6">
-        <div class="card shadow">
-            <div class="card-header">
-                <h6><i class="bi bi-bar-chart"></i> CAPAs by Type</h6>
-            </div>
-            <div class="card-body">
-                <canvas id="typeChart" height="300"></canvas>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Overdue CAPAs -->
-{% if overdue %}
-<div class="card shadow mb-4">
-    <div class="card-header bg-danger text-white">
-        <h6 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Overdue CAPAs ({{ overdue|length }})</h6>
-    </div>
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-sm">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Title</th>
-                        <th>Assignee</th>
-                        <th>Due Date</th>
-                        <th>Days Overdue</th>
-                        <th>Priority</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for capa in overdue %}
-                    <tr>
-                        <td><code>{{ capa.id[:8] }}</code></td>
-                        <td>{{ capa.title }}</td>
-                        <td>{{ capa.assignee }}</td>
-                        <td>{{ capa.due_date }}</td>
-                        <td><span class="badge bg-danger">{{ capa.days_overdue }} days</span></td>
-                        <td>
-                            <span class="badge bg-{{ 'danger' if capa.priority == 'critical' else ('warning' if capa.priority == 'high' else 'info') }}">
-                                {{ capa.priority|title }}
-                            </span>
-                        </td>
-                        <td>
-                            <a href="{{ url_for('capa.capa_detail', capa_id=capa.id) }}" class="btn btn-sm btn-outline-primary">
-                                <i class="bi bi-eye"></i> View
-                            </a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-{% endif %}
-
-<!-- Recent Activity -->
-<div class="row">
-    <div class="col-md-6">
-        <div class="card shadow">
-            <div class="card-header">
-                <h6><i class="bi bi-clock"></i> Recent CAPA Activity</h6>
-            </div>
-            <div class="card-body">
-                <div id="recentActivity">
-                    <div class="text-center py-3">
-                        <div class="spinner-border spinner-border-sm"></div>
-                        <p class="small text-muted mt-2">Loading recent activity...</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-6">
-        <div class="card shadow">
-            <div class="card-header">
-                <h6><i class="bi bi-graph-up"></i> Performance Metrics</h6>
-            </div>
-            <div class="card-body">
-                <div class="row text-center">
-                    <div class="col-6 border-end">
-                        <h4 class="text-info">{{ (stats.completed / (stats.completed + stats.overdue))|round(2) * 100 if (stats.completed + stats.overdue) > 0 else 0 }}%</h4>
-                        <small class="text-muted">On-Time Completion</small>
-                    </div>
-                    <div class="col-6">
-                        <h4 class="text-success">{{ stats.by_source.get('audit', 0) + stats.by_source.get('incident', 0) + stats.by_source.get('risk', 0) }}</h4>
-                        <small class="text-muted">System Generated</small>
-                    </div>
-                </div>
-                
-                <hr>
-                
-                <div class="mb-3">
-                    <label class="form-label">Source Distribution</label>
-                    {% for source, count in stats.by_source.items() %}
-                    <div class="d-flex justify-content-between">
-                        <span>{{ source|title }}:</span>
-                        <span class="fw-bold">{{ count }}</span>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Priority Distribution Chart
-    const priorityCtx = document.getElementById('priorityChart').getContext('2d');
-    new Chart(priorityCtx, {
-        type: 'doughnut',
-        data: {
-            labels: ['Critical', 'High', 'Medium', 'Low'],
-            datasets: [{
-                data: [
-                    {{ stats.by_priority.critical }},
-                    {{ stats.by_priority.high }},
-                    {{ stats.by_priority.medium }},
-                    {{ stats.by_priority.low }}
-                ],
-                backgroundColor: ['#dc3545', '#fd7e14', '#0dcaf0', '#6c757d']
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom'
-                }
-            }
-        }
-    });
-
-    // Type Distribution Chart
-    const typeCtx = document.getElementById('typeChart').getContext('2d');
-    new Chart(typeCtx, {
-        type: 'bar',
-        data: {
-            labels: ['Corrective', 'Preventive'],
-            datasets: [{
-                label: 'Number of CAPAs',
-                data: [
-                    {{ stats.by_type.corrective }},
-                    {{ stats.by_type.preventive }}
-                ],
-                backgroundColor: ['#ffc107', '#198754']
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        stepSize: 1
-                    }
-                }
-            },
-            plugins: {
-                legend: {
-                    display: false
-                }
-            }
-        }
-    });
-
-    // Load recent activity
-    loadRecentActivity();
-});
-
-function loadRecentActivity() {
-    // This would fetch recent CAPA updates in a real implementation
-    const recentActivity = document.getElementById('recentActivity');
-    
-    // Simulate recent activity data
-    const activities = [
-        {
-            action: "CAPA Created",
-            title: "Address audit finding: Emergency exit signage",
-            user: "Safety Manager",
-            time: "2 hours ago"
-        },
-        {
-            action: "CAPA Completed",
-            title: "Update chemical storage procedures",
-            user: "Operations Lead",
-            time: "1 day ago"
-        },
-        {
-            action: "CAPA Updated",
-            title: "Install additional fire extinguishers",
-            user: "Maintenance Team",
-            time: "2 days ago"
-        }
-    ];
-    
-    recentActivity.innerHTML = activities.map(activity => `
-        <div class="activity-item mb-3 p-2 bg-light rounded">
-            <div class="d-flex justify-content-between align-items-start">
-                <div>
-                    <strong>${activity.action}:</strong> ${activity.title}
-                    <br><small class="text-muted">By ${activity.user}</small>
-                </div>
-                <small class="text-muted">${activity.time}</small>
-            </div>
-        </div>
-    `).join('');
-}
-</script>
 {% endblock %}
