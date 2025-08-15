@@ -112,24 +112,39 @@ PROMPTS: Dict[str, str] = {
 def _is_yes_no(text: str) -> bool:
     return bool(re.fullmatch(r"(yes|no|y|n)\b", (text or "").strip().lower()))
 
-def _is_datetime(text: str) -> bool:
-    t = (text or "").strip()
-    if t.lower() == "unknown":
-        return True
-    try:
-        # Accept date or datetime
-        if re.match(r"^\d{4}-\d{2}-\d{2}$", t):
-            return True
-        dt = dt.datetime.fromisoformat(t.replace(" ", "T"))
-        return True if dt else False
-    except Exception:
-        return False
-
 def _nonempty(text: str) -> bool:
     return bool((text or "").strip())
 
 def _len_ok(text: str) -> bool:
     return len(text or "") <= MAX_FREEFORM_LEN
+
+# Accept YYYY-MM-DD, YYYY-MM-DD HH:MM / HH-MM, and 'unknown'
+def _is_datetime(text: str) -> bool:
+    t = (text or "").strip()
+    if not t:
+        return False
+    if t.lower() == "unknown":
+        return True
+
+    # Allow:
+    #   YYYY-MM-DD
+    #   YYYY-MM-DD HH:MM  or YYYY-MM-DD HH-MM
+    #   YYYY-MM-DDTHH:MM or YYYY-MM-DDTHH-MM
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}(?:[ T]\d{2}[:\-]\d{2})?", t):
+        return False
+
+    # Normalize HH-MM -> HH:MM for parsing
+    if len(t) > 10:
+        t = re.sub(r"([ T]\d{2})-(\d{2})$", r"\1:\2", t)
+
+    try:
+        if len(t) == 10:
+            dt.date.fromisoformat(t)  # date only
+        else:
+            dt.datetime.strptime(t.replace("T", " "), "%Y-%m-%d %H:%M")
+        return True
+    except Exception:
+        return False
 
 # map symbolic validator name -> (callable, error_text)
 VALIDATORS: Dict[str, Tuple] = {
@@ -153,14 +168,59 @@ class Conversation:
 _CONV: Dict[str, Conversation] = {}
 
 # ---------------------------------------------------------------------------
+# Event type helpers (aliases + multi-choice guard)
+_EVENT_ALIASES = {
+    "Injury/Illness": ["injury/illness", "injury", "illness", "injuries"],
+    "Vehicle": ["vehicle", "vehichle", "vechicle", "vehicule", "vehichal"],
+    "Environmental": ["environmental", "environment", "spill"],
+    "Depot Event": ["depot", "depot event"],
+    "Property Damage": ["property", "property damage"],
+    "Security Concern": ["security", "security concern"],
+    "Other": ["other"],
+}
+
+def _canonicalize_choice(text: str, options: List[str]) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Returns (canonical_option or None, error_message or None).
+    - If multiple recognizable options provided (e.g., 'injury and vehicle'), return an error to pick one.
+    - If a close alias/typo matches, return the canonical option.
+    """
+    raw = (text or "").strip().lower()
+    if not raw:
+        return None, "This field is required."
+
+    parts = re.split(r"\s*(?:,|/|&|and)\s*", raw)  # split obvious multi-choice inputs
+    hits: List[str] = []
+    for p in parts:
+        matched = False
+        for o in options:
+            if p == o.lower():
+                hits.append(o); matched = True; break
+        if matched:
+            continue
+        for canon, aliases in _EVENT_ALIASES.items():
+            if canon in options and p in aliases:
+                hits.append(canon); matched = True; break
+
+    # Unique, ordered
+    hits = list(dict.fromkeys(hits))
+    if len(hits) > 1:
+        return None, f"Please choose exactly one of: {', '.join(options)} (you mentioned multiple: {', '.join(hits)})."
+    if len(hits) == 1:
+        return hits[0], None
+    return None, f"Please choose exactly one of: {', '.join(options)}"
+
+# ---------------------------------------------------------------------------
 # Main Chatbot
 class SmartEHSChatbot:
     """
     Chat-first incident flow:
-      1) Basic info
-      2) Optional severe event details
-      3) Branch by event type
-      4) 5 Whys + CAPA fields
+      1) Description
+      2) When
+      3) Where
+      4) Event Type
+      5) Branch questions
+      6) 5 Whys + CAPA fields
     """
 
     def __init__(self, logger=None):
@@ -186,11 +246,11 @@ class SmartEHSChatbot:
     def start_incident(self, user_id: str) -> Dict[str, Any]:
         convo = Conversation(user_id=user_id)
         _CONV[user_id] = convo
-        # Enqueue shared basics
+        # Enqueue shared basics in the same order as the opening prompt
         basics = [
+            ("description", PROMPTS["description"], "nonempty", None),
             ("when", PROMPTS["when"], "datetime", None),
             ("where", PROMPTS["where"], "nonempty", None),
-            ("description", PROMPTS["description"], "nonempty", None),
             ("event_type", PROMPTS["event_type"], "nonempty", [
                 "Injury/Illness", "Vehicle", "Environmental", "Depot Event",
                 "Property Damage", "Security Concern", "Other"
@@ -218,17 +278,32 @@ class SmartEHSChatbot:
         # If expecting a field, validate & accept
         field_key, prompt, validator, options = convo.queue[0]
 
-        # Basic validation
-        ok, err = self._validate(field_key, text, validator, options)
-        if not ok:
-            return {
-                "reply": f"⚠️ {err}\n\n{prompt}",
-                "next_expected": field_key,
-                "done": False,
-            }
+        # Basic validation (do NOT pop on failure). Defer event_type option check to canonicalizer.
+        if validator:
+            fn, msg = VALIDATORS.get(validator, (None, None))
+            if fn and not fn(text):
+                return {"reply": f"⚠️ {msg or 'Invalid value.'}\n\n{prompt}", "next_expected": field_key, "done": False}
 
-        # Save value
-        convo.data[field_key] = text
+        if options and field_key != "event_type":
+            t = (text or "").strip()
+            if not any(t.lower() == o.lower() for o in options):
+                if STRICT_PDF_WORDING:
+                    return {"reply": f"⚠️ Please choose exactly one of: {', '.join(options)}\n\n{prompt}",
+                            "next_expected": field_key, "done": False}
+
+        if not _len_ok(text):
+            return {"reply": f"⚠️ {VALIDATORS['lenok'][1]}\n\n{prompt}", "next_expected": field_key, "done": False}
+
+        # Save value (with canonicalization for event_type)
+        value_to_save = text
+        if options and field_key == "event_type":
+            canon, emsg = _canonicalize_choice(text, options)
+            if emsg:
+                return {"reply": f"⚠️ {emsg}\n\n{prompt}", "next_expected": field_key, "done": False}
+            if canon:
+                value_to_save = canon
+
+        convo.data[field_key] = value_to_save
         convo.queue.pop(0)
 
         # Optional analytics
@@ -240,7 +315,7 @@ class SmartEHSChatbot:
 
         # Branch when event_type captured
         if field_key == "event_type":
-            et = text.strip()
+            et = value_to_save.strip()
             convo.event_type = et
             self._enqueue_branch(convo, et)
 
@@ -258,15 +333,14 @@ class SmartEHSChatbot:
 
     # ----------------- Internals -----------------
     def _validate(self, key: str, text: str, validator: Optional[str], options: Optional[List[str]]) -> Tuple[bool, str]:
+        # (Kept for backward compatibility; process_message now does the checks inline to keep granularity.)
         if validator:
             fn, msg = VALIDATORS.get(validator, (None, None))
             if fn and not fn(text):
                 return False, msg or "Invalid value."
-        if options:
-            # Provide gentle check on multiple-choice lists
+        if options and key != "event_type":  # event_type is handled by canonicalizer
             t = (text or "").strip()
             if not any(t.lower() == o.lower() for o in options):
-                # Soft fail: allow free text but nudge if STRICT
                 if STRICT_PDF_WORDING:
                     return False, f"Please choose exactly one of: {', '.join(options)}"
         if not _len_ok(text):
@@ -416,15 +490,29 @@ class SmartEHSChatbot:
 # Backward-compat shim: SmartIntentClassifier
 # routes/chatbot.py expects this to exist.
 class SmartIntentClassifier:
+    _INTENTS = [
+        ("Report incident", r"\breport( an)? incident\b|\bincident report\b|\bstart .*incident\b"),
+        ("Safety concern", r"\bsafety concern\b|\bnear miss\b|\bunsafe\b"),
+        ("Find SDS", r"\b(find )?sds\b|\bsafety data sheet\b"),
+        ("Risk assessment", r"\brisk assessment\b|\berc\b|\blikelihood\b"),
+        ("What's urgent?", r"\burgent\b|\bpriority\b|\boverdue\b"),
+        ("Help with this page", r"\btour\b|\bgetting started\b|\bguide\b|\bonboard\b"),
+    ]
+
     def quick_intent(self, text: str) -> str:
         t = (text or "").lower().strip()
-        if re.search(r"\breport( an)? incident\b|\bincident report\b|\bstart .*incident\b", t):
-            return "Report incident"
-        if re.search(r"\bsafety concern\b|\bnear miss\b|\bunsafe\b", t):
-            return "Safety concern"
-        if re.search(r"\b(find )?sds\b|\bsafety data sheet\b", t):
-            return "Find SDS"
+        for label, pattern in self._INTENTS:
+            if re.search(pattern, t):
+                return label
         return "Unknown"
+
+    # Some routes call classify_intent; provide it too.
+    def classify_intent(self, text: str) -> Tuple[str, float]:
+        t = (text or "").lower().strip()
+        for label, pattern in self._INTENTS:
+            if re.search(pattern, t):
+                return label, 0.95
+        return "Unknown", 0.0
 
 # ---------------------------------------------------------------------------
 # Backward-compat shim: five_whys_manager (very small in-memory session store)
