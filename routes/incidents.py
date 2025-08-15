@@ -39,15 +39,99 @@ def list_incidents():
 def new_incident():
     if request.method == "GET":
         return render_template("incident_new.html")
+
+    # Build the incident record from the AVOMO form fields
     data = {
         "id": str(int(time.time()*1000)),
-        "type": request.form.get("type") or "other",
+        "created_ts": time.time(),
+        "status": "draft",
+        "type": "other",  # will be normalized later by validator if needed
+        # Basic
+        "event_date": request.form.get("event_date", "").strip(),
+        "event_time": request.form.get("event_time", "").strip(),
+        "site": request.form.get("site", "").strip(),
         "anonymous": bool(request.form.get("anonymous")),
-        "facility_code": request.form.get("facility_code", ""),
-        "region": request.form.get("region", ""),
-        "location_lat": request.form.get("location_lat", ""),
-        "location_lng": request.form.get("location_lng", ""),
-        "location_text": request.form.get("location_text", ""),
+        "facility_code": request.form.get("facility_code", "").strip(),
+        "location_lat": request.form.get("location_lat", "").strip(),
+        "location_lng": request.form.get("location_lng", "").strip(),
+        "location_text": request.form.get("location_text", "").strip(),
+        # Reporter (dropped if anonymous)
+        "reporter": request.form.get("reporter", "").strip(),
+        "reporter_contact": request.form.get("reporter_contact", "").strip(),
+        # AVOMO gates
+        "severe_event_flag": (request.form.get("severe_event_flag") or "").strip().lower(),  # 'yes' or 'no'
+        "severe_event_type": request.form.get("severe_event_type", "").strip(),
+        "severe_event_description": request.form.get("severe_event_description", "").strip(),
+        "event_type": (request.form.get("event_type") or "").strip(),  # Safety Concern, Injury/Illness, ...
+        # Injury/Illness
+        "inj_name": request.form.get("inj_name", "").strip(),
+        "inj_job_title": request.form.get("inj_job_title", "").strip(),
+        "inj_phone": request.form.get("inj_phone", "").strip(),
+        "inj_address": request.form.get("inj_address", "").strip(),
+        "inj_city": request.form.get("inj_city", "").strip(),
+        "inj_state": request.form.get("inj_state", "").strip(),
+        "inj_zip": request.form.get("inj_zip", "").strip(),
+        "inj_status": request.form.get("inj_status", "").strip(),
+        "supervisor_name": request.form.get("supervisor_name", "").strip(),
+        "supervisor_notified_date": request.form.get("supervisor_notified_date", "").strip(),
+        "supervisor_notified_time": request.form.get("supervisor_notified_time", "").strip(),
+        "inj_event_description": request.form.get("inj_event_description", "").strip(),
+        "inj_type": request.form.get("inj_type", "").strip(),
+        "inj_body_parts": request.form.get("inj_body_parts", "").strip(),
+        "inj_immediate_action": request.form.get("inj_immediate_action", "").strip(),
+        "inj_enablon_confirm": request.form.get("inj_enablon_confirm", "").strip(),
+        # Property
+        "prop_description": request.form.get("prop_description", "").strip(),
+        "prop_cost": request.form.get("prop_cost", "").strip(),
+        "prop_corrective_action": request.form.get("prop_corrective_action", "").strip(),
+        "prop_enablon_confirm": request.form.get("prop_enablon_confirm", "").strip(),
+        # Security
+        "sec_types": request.form.get("sec_types", "").strip(),
+        "sec_description": request.form.get("sec_description", "").strip(),
+        "sec_names": request.form.get("sec_names", "").strip(),
+        "sec_are_they": request.form.get("sec_are_they", "").strip(),
+        "sec_law": request.form.get("sec_law", "").strip(),
+        "sec_agency_details": request.form.get("sec_agency_details", "").strip(),
+        "sec_footage": request.form.get("sec_footage", "").strip(),
+        "sec_corrective_action": request.form.get("sec_corrective_action", "").strip(),
+        "sec_enablon_confirm": request.form.get("sec_enablon_confirm", "").strip(),
+        # Vehicle
+        "collision_location": request.form.get("collision_location", "").strip(),
+        "involved_parties": request.form.get("involved_parties", "").strip(),
+        "vehicle_identifier": request.form.get("vehicle_identifier", "").strip(),
+        "vehicle_hit": request.form.get("vehicle_hit", "").strip(),
+        "collision_any_injury": request.form.get("collision_any_injury", "").strip(),
+        "collision_mode": request.form.get("collision_mode", "").strip(),
+        "collision_description": request.form.get("collision_description", "").strip(),
+        "collision_corrective_action": request.form.get("collision_corrective_action", "").strip(),
+        "collision_enablon_confirm": request.form.get("collision_enablon_confirm", "").strip(),
+        # Environmental
+        "env_involved_parties": request.form.get("env_involved_parties", "").strip(),
+        "env_roles": request.form.get("env_roles", "").strip(),
+        "spill_volume": request.form.get("spill_volume", "").strip(),
+        "chemicals": request.form.get("chemicals", "").strip(),
+        "env_description": request.form.get("env_description", "").strip(),
+        "env_corrective_action": request.form.get("env_corrective_action", "").strip(),
+        "env_enablon_confirm": request.form.get("env_enablon_confirm", "").strip(),
+        # Depot
+        "depot_description": request.form.get("depot_description", "").strip(),
+        "depot_actions": request.form.get("depot_actions", "").strip(),
+        "depot_outcome": request.form.get("depot_outcome", "").strip(),
+        # Near Miss
+        "near_type": request.form.get("near_type", "").strip(),
+        "near_description": request.form.get("near_description", "").strip(),
+        "near_corrective_action": request.form.get("near_corrective_action", "").strip(),
+        # 5 Whys + CAPA
+        "why1": request.form.get("why1", "").strip(),
+        "why2": request.form.get("why2", "").strip(),
+        "why3": request.form.get("why3", "").strip(),
+        "why4": request.form.get("why4", "").strip(),
+        "why5": request.form.get("why5", "").strip(),
+        "capa_action": request.form.get("capa_action", "").strip(),
+        "capa_owner": request.form.get("capa_owner", "").strip(),
+        "capa_owner_email": request.form.get("capa_owner_email", "").strip(),
+        "capa_due": request.form.get("capa_due", "").strip(),
+        # keep the old answers bucket so dashboards don’t break
         "answers": {
             "people": request.form.get("people") or "",
             "environment": request.form.get("environment") or "",
@@ -55,14 +139,34 @@ def new_incident():
             "legal": request.form.get("legal") or "",
             "reputation": request.form.get("reputation") or "",
         },
-        "created_ts": time.time(),
-        "status": "draft"
     }
+
+    # If anonymous, drop reporter details
+    if data.get("anonymous"):
+        data["reporter"] = ""
+        data["reporter_contact"] = ""
+
+    # Normalize canonical type from AVOMO label (validator handles this)
+    from services.incident_validator import normalize_incident_type
+    data["type"] = normalize_incident_type({"event_type": data.get("event_type", "")})
+
     items = load_incidents()
     items[data["id"]] = data
     save_incidents(items)
-    flash("Incident created (draft). Continue filling it.", "success")
+
+    # Immediate validate + bounce to edit page for any missing fields
+    ok, missing = validate_record(data)
+    data["status"] = "complete" if ok else "incomplete"
+    items[data["id"]] = data
+    save_incidents(items)
+
+    if ok:
+        flash("Incident created and validated ✔", "success")
+    else:
+        flash(f"Incident saved. Missing required fields: {', '.join(missing)}", "warning")
+
     return redirect(url_for("incidents.edit_incident", iid=data["id"]))
+
 
 @incidents_bp.route("/<iid>/edit", methods=["GET", "POST"])
 def edit_incident(iid):
