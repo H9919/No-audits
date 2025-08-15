@@ -116,6 +116,120 @@
             transform: translateY(-1px);
         }
 
+        /* Enhanced UI for new chatbot features */
+        .form-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+        }
+
+        .form-button {
+            background: rgba(37, 99, 235, 0.1);
+            border: 1px solid var(--primary-color);
+            color: var(--primary-color);
+            padding: 0.6rem 1.2rem;
+            border-radius: 0.5rem;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-width: 80px;
+            text-align: center;
+        }
+
+        .form-button:hover, .form-button.selected {
+            background: var(--primary-color);
+            color: white;
+            transform: translateY(-1px);
+        }
+
+        .form-button.multi-select.selected {
+            background: var(--success-color);
+            border-color: var(--success-color);
+        }
+
+        .datetime-input {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+            align-items: center;
+        }
+
+        .datetime-input input {
+            border: 2px solid #e2e8f0;
+            border-radius: 0.5rem;
+            padding: 0.5rem;
+            font-size: 0.9rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .datetime-input input:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .textarea-input {
+            width: 100%;
+            margin-top: 0.75rem;
+            padding: 0.75rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 0.5rem;
+            font-size: 0.9rem;
+            outline: none;
+            transition: border-color 0.2s;
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .textarea-input:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .helper-text {
+            font-size: 0.8rem;
+            color: var(--secondary-color);
+            margin-top: 0.5rem;
+            font-style: italic;
+        }
+
+        .extracted-data {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid var(--success-color);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin: 0.75rem 0;
+        }
+
+        .extracted-data h6 {
+            color: var(--success-color);
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .extracted-item {
+            margin-bottom: 0.25rem;
+            font-size: 0.9rem;
+        }
+
+        .dropdown-select {
+            width: 100%;
+            margin-top: 0.75rem;
+            padding: 0.75rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 0.5rem;
+            font-size: 0.9rem;
+            outline: none;
+            transition: border-color 0.2s;
+            background: white;
+        }
+
+        .dropdown-select:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
         .action-buttons {
             display: flex;
             flex-wrap: wrap;
@@ -304,6 +418,50 @@
             margin-bottom: 0.5rem;
             font-weight: 600;
         }
+
+        .inline-form {
+            margin-top: 0.75rem;
+        }
+
+        .inline-input {
+            width: 100%;
+            border: 2px solid #e2e8f0;
+            border-radius: 0.5rem;
+            padding: 0.75rem;
+            font-size: 0.9rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .inline-input:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .submit-btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            margin-top: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .submit-btn:hover {
+            background: #1d4ed8;
+            transform: translateY(-1px);
+        }
+
+        .error-message {
+            color: var(--danger-color);
+            font-size: 0.85rem;
+            margin-top: 0.5rem;
+            padding: 0.5rem;
+            background: rgba(239, 68, 68, 0.1);
+            border-radius: 0.25rem;
+        }
     </style>
 </head>
 <body>
@@ -358,6 +516,7 @@
                                     📋 Safety Data Sheets (SDS)
                                 </div>
                                 <div class="menu-item" onclick="sendMessage('Start audit')">
+                                    🔍 Safety Audits & Inspections
                                 </div>
                             </div>
 
@@ -401,6 +560,8 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         let messageHistory = [];
+        let currentIncidentData = {};
+        let selectedOptions = new Set();
 
         function handleKeyPress(event) {
             if (event.key === 'Enter') {
@@ -430,7 +591,7 @@
             messageDiv.className = 'message message-user';
             messageDiv.innerHTML = `
                 <div class="message-content">
-                    <div class="message-bubble">${message}</div>
+                    <div class="message-bubble">${escapeHtml(message)}</div>
                     <div class="user-avatar">
                         <i class="bi bi-person"></i>
                     </div>
@@ -451,8 +612,18 @@
                         <i class="bi bi-robot"></i>
                     </div>
                     <div class="message-bubble">
-                        ${response.message}
+                        ${response.reply || response.message}
             `;
+
+            // Add extracted data confirmation
+            if (response.extracted_data) {
+                messageContent += createExtractedDataDisplay(response.extracted_data);
+            }
+
+            // Add form inputs based on UI type
+            if (response.ui && !response.done) {
+                messageContent += createFormInput(response);
+            }
 
             // Add action buttons
             if (response.actions && response.actions.length > 0) {
@@ -476,6 +647,11 @@
                 messageContent += '</div>';
             }
 
+            // Add completion buttons
+            if (response.done && response.result) {
+                messageContent += createCompletionButtons(response);
+            }
+
             // Add guidance
             if (response.guidance) {
                 messageContent += `
@@ -488,20 +664,7 @@
 
             // Add risk information
             if (response.risk_info) {
-                messageContent += `
-                    <div class="risk-matrix">
-                        <h6><i class="bi bi-exclamation-triangle"></i> Risk Assessment Scale</h6>
-                        <p><strong>Likelihood Scale (0-10):</strong></p>
-                        <ul>
-                `;
-                Object.entries(response.risk_info.likelihood_scale).forEach(([score, info]) => {
-                    messageContent += `<li><strong>${score}:</strong> ${info.label} - ${info.description}</li>`;
-                });
-                messageContent += `
-                        </ul>
-                        <p><strong>Severity Categories:</strong> ${response.risk_info.severity_categories.join(', ')}</p>
-                    </div>
-                `;
+                messageContent += createRiskMatrix(response.risk_info);
             }
 
             // Add quick replies
@@ -509,7 +672,7 @@
                 messageContent += '<div class="quick-replies">';
                 response.quick_replies.forEach(reply => {
                     messageContent += `
-                        <button class="quick-reply-btn" onclick="sendMessage('${reply}')">
+                        <button class="quick-reply-btn" onclick="sendMessage('${escapeHtml(reply)}')">
                             ${reply}
                         </button>
                     `;
@@ -523,6 +686,281 @@
             scrollToBottom();
         }
 
+        function createExtractedDataDisplay(data) {
+            let html = '<div class="extracted-data"><h6><i class="bi bi-check-circle"></i> Extracted Information</h6>';
+            
+            if (data.event_type) {
+                html += `<div class="extracted-item">📋 <strong>Event Type:</strong> ${data.event_type}</div>`;
+            }
+            if (data.people && data.people.length > 0) {
+                html += `<div class="extracted-item">👥 <strong>People Involved:</strong> ${data.people.join(', ')}</div>`;
+            }
+            if (data.where) {
+                html += `<div class="extracted-item">📍 <strong>Location:</strong> ${data.where}</div>`;
+            }
+            if (data.body_parts && data.body_parts.length > 0) {
+                html += `<div class="extracted-item">🦴 <strong>Body Parts:</strong> ${data.body_parts.join(', ')}</div>`;
+            }
+            if (data.injuries && data.injuries.length > 0) {
+                html += `<div class="extracted-item">🏥 <strong>Injury Type:</strong> ${data.injuries.join(', ')}</div>`;
+            }
+            if (data.chemicals) {
+                html += `<div class="extracted-item">⚗️ <strong>Chemicals:</strong> ${data.chemicals}</div>`;
+            }
+            if (data.costs && data.costs.length > 0) {
+                html += `<div class="extracted-item">💰 <strong>Estimated Cost:</strong> ${data.costs.join(', ')}</div>`;
+            }
+            
+            html += '</div>';
+            return html;
+        }
+
+        function createFormInput(response) {
+            const fieldKey = response.next_expected;
+            let html = '';
+
+            if (response.ui === 'buttons' && response.options) {
+                html += '<div class="form-buttons">';
+                response.options.forEach(option => {
+                    const multiClass = response.multi_select ? 'multi-select' : '';
+                    html += `
+                        <button class="form-button ${multiClass}" 
+                                onclick="selectFormOption('${escapeHtml(option)}', '${fieldKey}', ${response.multi_select || false})">
+                            ${option}
+                        </button>
+                    `;
+                });
+                html += '</div>';
+                
+                if (response.multi_select) {
+                    html += `
+                        <button class="submit-btn" onclick="submitMultiSelect('${fieldKey}')">
+                            Submit Selected
+                        </button>
+                    `;
+                }
+            } else if (response.ui === 'datetime') {
+                html += `
+                    <div class="datetime-input">
+                        <input type="date" id="dateInput_${fieldKey}" />
+                        <input type="time" id="timeInput_${fieldKey}" />
+                        <button class="submit-btn" onclick="submitDateTime('${fieldKey}')">Submit</button>
+                    </div>
+                    <div class="inline-form">
+                        <input type="text" class="inline-input" id="manualDateTime_${fieldKey}" 
+                               placeholder="${response.placeholder || 'YYYY-MM-DD or YYYY-MM-DD HH:MM'}" />
+                        <button class="submit-btn" onclick="submitManualDateTime('${fieldKey}')">
+                            Submit Manually
+                        </button>
+                    </div>
+                `;
+            } else if (response.ui === 'textarea') {
+                html += `
+                    <div class="inline-form">
+                        <textarea class="textarea-input" id="textareaInput_${fieldKey}" 
+                                  placeholder="${response.placeholder || 'Enter details...'}"></textarea>
+                        <button class="submit-btn" onclick="submitTextarea('${fieldKey}')">Submit</button>
+                    </div>
+                `;
+            } else if (response.ui === 'dropdown' && response.options) {
+                html += `
+                    <select class="dropdown-select" id="dropdownInput_${fieldKey}">
+                        <option value="">Choose an option...</option>
+                        ${response.options.map(opt => `<option value="${escapeHtml(opt)}">${opt}</option>`).join('')}
+                    </select>
+                    <button class="submit-btn" onclick="submitDropdown('${fieldKey}')">Submit</button>
+                `;
+            } else {
+                // Default text input
+                html += `
+                    <div class="inline-form">
+                        <input type="text" class="inline-input" id="textInput_${fieldKey}" 
+                               placeholder="${response.placeholder || 'Enter your answer...'}" />
+                        <button class="submit-btn" onclick="submitTextInput('${fieldKey}')">Submit</button>
+                    </div>
+                `;
+            }
+
+            if (response.helper_text) {
+                html += `<div class="helper-text">${response.helper_text}</div>`;
+            }
+
+            return html;
+        }
+
+        function createCompletionButtons(response) {
+            let html = '<div class="action-buttons">';
+            
+            if (response.options) {
+                response.options.forEach(option => {
+                    let btnClass = 'btn-primary';
+                    if (option.includes('Submit')) btnClass = 'btn-success';
+                    else if (option.includes('Review')) btnClass = 'btn-info';
+                    else if (option.includes('Another')) btnClass = 'btn-secondary';
+                    
+                    html += `
+                        <button class="action-btn ${btnClass}" onclick="sendMessage('${escapeHtml(option)}')">
+                            ${getCompletionIcon(option)} ${option}
+                        </button>
+                    `;
+                });
+            } else {
+                html += `
+                    <button class="action-btn btn-success" onclick="sendMessage('Submit Report')">
+                        <i class="bi bi-check-circle"></i> Submit Report
+                    </button>
+                    <button class="action-btn btn-secondary" onclick="sendMessage('Create Another Report')">
+                        <i class="bi bi-plus-circle"></i> New Report
+                    </button>
+                `;
+            }
+            
+            html += '</div>';
+            return html;
+        }
+
+        function createRiskMatrix(riskInfo) {
+            let html = `
+                <div class="risk-matrix">
+                    <h6><i class="bi bi-exclamation-triangle"></i> Risk Assessment Scale</h6>
+                    <p><strong>Likelihood Scale (0-10):</strong></p>
+                    <ul>
+            `;
+            
+            if (riskInfo.likelihood_scale) {
+                Object.entries(riskInfo.likelihood_scale).forEach(([score, info]) => {
+                    html += `<li><strong>${score}:</strong> ${info.label} - ${info.description}</li>`;
+                });
+            }
+            
+            html += '</ul>';
+            
+            if (riskInfo.severity_categories) {
+                html += `<p><strong>Severity Categories:</strong> ${riskInfo.severity_categories.join(', ')}</p>`;
+            }
+            
+            html += '</div>';
+            return html;
+        }
+
+        // Form interaction functions
+        function selectFormOption(option, fieldKey, multiSelect) {
+            if (multiSelect) {
+                const button = event.target;
+                if (selectedOptions.has(option)) {
+                    selectedOptions.delete(option);
+                    button.classList.remove('selected');
+                } else {
+                    selectedOptions.add(option);
+                    button.classList.add('selected');
+                }
+            } else {
+                // Single select - submit immediately
+                sendMessage(option);
+            }
+        }
+
+        function submitMultiSelect(fieldKey) {
+            if (selectedOptions.size === 0) {
+                showError('Please select at least one option.');
+                return;
+            }
+            
+            const selectedArray = Array.from(selectedOptions);
+            const message = selectedArray.join(', ');
+            selectedOptions.clear();
+            sendMessage(message);
+        }
+
+        function submitDateTime(fieldKey) {
+            const dateInput = document.getElementById(`dateInput_${fieldKey}`);
+            const timeInput = document.getElementById(`timeInput_${fieldKey}`);
+            
+            if (!dateInput.value) {
+                showError('Please select a date.');
+                return;
+            }
+            
+            let message = dateInput.value;
+            if (timeInput.value) {
+                message += ` ${timeInput.value}`;
+            }
+            
+            sendMessage(message);
+        }
+
+        function submitManualDateTime(fieldKey) {
+            const input = document.getElementById(`manualDateTime_${fieldKey}`);
+            const value = input.value.trim();
+            
+            if (!value) {
+                showError('Please enter a date/time or type "unknown".');
+                return;
+            }
+            
+            sendMessage(value);
+        }
+
+        function submitTextarea(fieldKey) {
+            const textarea = document.getElementById(`textareaInput_${fieldKey}`);
+            const value = textarea.value.trim();
+            
+            if (!value) {
+                showError('Please enter some text.');
+                return;
+            }
+            
+            sendMessage(value);
+        }
+
+        function submitDropdown(fieldKey) {
+            const select = document.getElementById(`dropdownInput_${fieldKey}`);
+            const value = select.value;
+            
+            if (!value) {
+                showError('Please select an option.');
+                return;
+            }
+            
+            sendMessage(value);
+        }
+
+        function submitTextInput(fieldKey) {
+            const input = document.getElementById(`textInput_${fieldKey}`);
+            const value = input.value.trim();
+            
+            if (!value) {
+                showError('Please enter a value.');
+                return;
+            }
+            
+            sendMessage(value);
+        }
+
+        function showError(message) {
+            const lastMessage = document.querySelector('.message:last-child .message-bubble');
+            if (lastMessage) {
+                // Remove any existing error messages
+                const existingError = lastMessage.querySelector('.error-message');
+                if (existingError) {
+                    existingError.remove();
+                }
+                
+                // Add new error message
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error-message';
+                errorDiv.innerHTML = `<i class="bi bi-exclamation-triangle"></i> ${message}`;
+                lastMessage.appendChild(errorDiv);
+                
+                // Remove error after 3 seconds
+                setTimeout(() => {
+                    if (errorDiv.parentNode) {
+                        errorDiv.remove();
+                    }
+                }, 3000);
+            }
+        }
+
         function getActionIcon(style) {
             const icons = {
                 primary: '<i class="bi bi-arrow-right"></i>',
@@ -533,6 +971,13 @@
                 info: '<i class="bi bi-info-circle"></i>'
             };
             return icons[style] || '<i class="bi bi-arrow-right"></i>';
+        }
+
+        function getCompletionIcon(option) {
+            if (option.includes('Submit')) return '<i class="bi bi-check-circle"></i>';
+            if (option.includes('Review')) return '<i class="bi bi-eye"></i>';
+            if (option.includes('Another') || option.includes('New')) return '<i class="bi bi-plus-circle"></i>';
+            return '<i class="bi bi-arrow-right"></i>';
         }
 
         function showTyping() {
@@ -549,6 +994,12 @@
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
 
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
         async function processMessage(message) {
             showTyping();
             
@@ -563,25 +1014,186 @@
                     },
                     body: JSON.stringify({
                         message: message,
-                        user_id: 'demo_user'
+                        user_id: getUserId(),
+                        context: currentIncidentData
                     })
                 });
                 
                 const data = await response.json();
                 hideTyping();
+                
+                // Update incident data if provided
+                if (data.result && data.result.data) {
+                    currentIncidentData = data.result.data;
+                }
+                
                 addBotMessage(data);
                 
             } catch (error) {
                 hideTyping();
-                addBotMessage({
-                    message: "I'm sorry, I'm having trouble connecting right now. Please try again or contact support if the issue persists.",
-                    type: "error"
-                });
+                
+                // Fallback to demo mode if API is not available
+                console.log('API not available, using demo mode');
+                const demoResponse = generateDemoResponse(message);
+                addBotMessage(demoResponse);
             }
         }
 
+        function generateDemoResponse(message) {
+            const lowerMessage = message.toLowerCase();
+            
+            // Demo responses for testing UI components
+            if (lowerMessage.includes('report') && lowerMessage.includes('incident')) {
+                return {
+                    reply: "🚨 **Incident Report**\n\nPlease describe what happened in detail. Include who was involved, what occurred, when it happened, and the sequence of events:",
+                    next_expected: "description",
+                    done: false,
+                    ui: "textarea",
+                    placeholder: "Describe the incident in detail..."
+                };
+            }
+            
+            if (lowerMessage.includes('worker john') || message.length > 50) {
+                return {
+                    reply: "🤖 **I extracted these details from your description:**",
+                    extracted_data: {
+                        event_type: "Injury/Illness",
+                        people: ["John", "Jack", "Steve"],
+                        where: "Laboratory",
+                        body_parts: ["hand", "legs"],
+                        injuries: ["fracture"],
+                        chemicals: ["oil"],
+                        costs: ["$10,000"]
+                    },
+                    next_expected: "confirmation",
+                    done: false,
+                    ui: "buttons",
+                    options: ["Yes, correct", "Some corrections needed", "Start over"]
+                };
+            }
+            
+            if (lowerMessage.includes('yes') || lowerMessage.includes('correct')) {
+                return {
+                    reply: "When did this happen?",
+                    next_expected: "when",
+                    done: false,
+                    ui: "datetime",
+                    placeholder: "YYYY-MM-DD or YYYY-MM-DD HH:MM",
+                    helper_text: "Use date picker or type manually. You can also type 'unknown'"
+                };
+            }
+            
+            if (lowerMessage.includes('2025-08-12')) {
+                return {
+                    reply: "Where did it happen? (site/facility and exact location)",
+                    next_expected: "where",
+                    done: false,
+                    ui: "text",
+                    placeholder: "Enter location..."
+                };
+            }
+            
+            if (lowerMessage.includes('atlanta')) {
+                return {
+                    reply: "Employee status:",
+                    next_expected: "inj_status",
+                    done: false,
+                    ui: "buttons",
+                    options: ["Full time", "Part time", "Temporary", "Contractor", "Visitor", "Other"]
+                };
+            }
+            
+            if (lowerMessage.includes('full time')) {
+                return {
+                    reply: "Injury type:",
+                    next_expected: "inj_injury_type",
+                    done: false,
+                    ui: "dropdown",
+                    options: [
+                        "Cut, Laceration, or Puncture",
+                        "Burn",
+                        "Fracture",
+                        "Bruise/Contusion",
+                        "Sprain or Strain",
+                        "Dislocation",
+                        "Other"
+                    ]
+                };
+            }
+            
+            if (lowerMessage.includes('fracture')) {
+                return {
+                    reply: "Type of Security Event:",
+                    next_expected: "security_event_types",
+                    done: false,
+                    ui: "buttons",
+                    options: ["Theft", "Trespassing", "Vandalism", "Workplace Violence/Threat", "Other"],
+                    multi_select: true,
+                    helper_text: "You can select multiple options"
+                };
+            }
+            
+            if (lowerMessage.includes('theft')) {
+                return {
+                    reply: "✅ **Incident Report Complete!**\n\n**Event Type**: Injury/Illness\n**Date/Time**: 2025-08-12\n**Location**: Atlanta Plymouth\n**Injured Person**: John\n\n📄 Your report has been captured and is ready for review.",
+                    done: true,
+                    result: {
+                        ok: true,
+                        data: currentIncidentData,
+                        completed: true
+                    },
+                    ui: "buttons",
+                    options: ["Submit Report", "Create Another Report", "Review & Edit"]
+                };
+            }
+            
+            // Default responses
+            if (lowerMessage.includes('risk assessment')) {
+                return {
+                    message: "I can help you with risk assessment! Here's our risk evaluation framework:",
+                    risk_info: {
+                        likelihood_scale: {
+                            "1-2": { label: "Very Low", description: "Highly unlikely to occur" },
+                            "3-4": { label: "Low", description: "Unlikely but possible" },
+                            "5-6": { label: "Medium", description: "May occur occasionally" },
+                            "7-8": { label: "High", description: "Likely to occur" },
+                            "9-10": { label: "Very High", description: "Almost certain to occur" }
+                        },
+                        severity_categories: ["Minor", "Moderate", "Major", "Severe", "Critical"]
+                    },
+                    quick_replies: ["Calculate risk score", "View risk matrix", "Risk assessment help"]
+                };
+            }
+            
+            return {
+                message: "I understand you said: '" + message + "'. How can I help you with EHS matters today?",
+                quick_replies: ["Report incident", "Risk assessment", "Find SDS", "Safety concern"]
+            };
+        }
+
+        function getUserId() {
+            // Generate or retrieve user ID
+            let userId = localStorage.getItem('ehs_user_id');
+            if (!userId) {
+                userId = 'user_' + Math.random().toString(36).substr(2, 9);
+                localStorage.setItem('ehs_user_id', userId);
+            }
+            return userId;
+        }
+
         function showMenu() {
-            sendMessage('Show main menu');
+            const menuMessage = {
+                message: "📋 **Main Menu**\n\nChoose what you'd like to do:",
+                quick_replies: [
+                    "Report an incident",
+                    "Risk assessment", 
+                    "Find SDS",
+                    "Safety concern",
+                    "Corrective actions",
+                    "Start audit"
+                ]
+            };
+            addBotMessage(menuMessage);
         }
 
         function showEmergency() {
@@ -625,8 +1237,47 @@
             showEmergency();
         }
 
-        // Auto-focus on input
+        // Initialize
         document.getElementById('messageInput').focus();
+        
+        // Add keyboard shortcuts
+        document.addEventListener('keydown', function(event) {
+            // Alt + Enter to send message
+            if (event.altKey && event.key === 'Enter') {
+                sendUserMessage();
+            }
+            
+            // Escape to clear input
+            if (event.key === 'Escape') {
+                document.getElementById('messageInput').value = '';
+                document.getElementById('messageInput').focus();
+            }
+        });
+
+        // Auto-resize textarea inputs
+        document.addEventListener('input', function(event) {
+            if (event.target.classList.contains('textarea-input')) {
+                event.target.style.height = 'auto';
+                event.target.style.height = event.target.scrollHeight + 'px';
+            }
+        });
+
+        // Add loading states to buttons
+        document.addEventListener('click', function(event) {
+            if (event.target.classList.contains('submit-btn') || 
+                event.target.classList.contains('form-button') ||
+                event.target.classList.contains('action-btn')) {
+                
+                const originalText = event.target.innerHTML;
+                event.target.innerHTML = '<i class="bi bi-hourglass-split"></i> Processing...';
+                event.target.disabled = true;
+                
+                setTimeout(() => {
+                    event.target.innerHTML = originalText;
+                    event.target.disabled = false;
+                }, 1500);
+            }
+        });
     </script>
 </body>
 </html>
