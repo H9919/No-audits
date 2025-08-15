@@ -1,4 +1,4 @@
-# routes/chatbot.py — full-featured, fixed endpoints, compatible with UI
+# routes/chatbot.py — fixed endpoints, original UI untouched
 from flask import Blueprint, request, jsonify, render_template, current_app as app
 from pathlib import Path
 import time, json, logging, re
@@ -7,13 +7,13 @@ from services.ehs_chatbot import SmartEHSChatbot, SmartIntentClassifier, five_wh
 from services.capa_manager import CAPAManager
 from utils.uploads import is_allowed, save_upload
 
-# If you previously had NORMALIZE_INPUTS, keep it False to avoid collapsing user text.
+# Keep inputs as typed (avoid collapsing everything to a keyword)
 NORMALIZE_INPUTS = False
 
 chatbot_bp = Blueprint("chatbot", __name__, url_prefix="/chatbot")
 
 # -------------------------
-# Singleton bot (very light)
+# Singleton bot (lightweight)
 # -------------------------
 _CHATBOT = None
 def get_chatbot():
@@ -28,6 +28,7 @@ _INTENTS = SmartIntentClassifier()
 # Helpers
 # -------------------------
 def _normalize_intent_text(t: str) -> str:
+    """Optional soft normalization. Left off by default."""
     if not NORMALIZE_INPUTS:
         return t or ""
     s = (t or "").strip().lower()
@@ -46,7 +47,7 @@ def _user_id_from_req() -> str:
 def _fmt_bot(result):
     """
     Normalize bot outputs for the UI.
-    Prefers 'reply', bubbles next_expected/done/result if present.
+    Prefers 'reply'; bubbles next_expected/done/result if present.
     """
     out = {"type": "bot", "message": "", "done": False}
     if isinstance(result, dict):
@@ -64,10 +65,12 @@ def _fmt_bot(result):
     return out
 
 # ------------------------------------------------
-# UI route (optional): render the chatbot template
+# (Optional) UI route — your existing template stays
 # ------------------------------------------------
 @chatbot_bp.get("/")
 def chat_ui():
+    # If you already had a chatbot template, this will use it.
+    # Otherwise, remove this route or point it to your existing page.
     return render_template("chatbot.html")
 
 # --------------------------------------
@@ -91,7 +94,7 @@ def chat():
     if not user_message and "upload" not in request.files:
         return jsonify({"type": "bot", "message": "Please type a message or attach a file."}), 400
 
-    # Optional upload handling — convert to a note the bot can see
+    # Optional upload handling — save and append a note for the bot
     if "upload" in request.files and request.files["upload"].filename:
         f = request.files["upload"]
         if not is_allowed(f.filename):
@@ -99,30 +102,25 @@ def chat():
         saved = save_upload(f)
         user_message = (user_message + f"\n\n[Attached file: {saved.name}]").strip()
 
-    # Light normalization (if enabled)
+    # Optional normalization (off by default)
     user_message_norm = _normalize_intent_text(user_message)
 
     bot = get_chatbot()
 
-    # QUICK INTENTS → give a useful first prompt (not "OK")
+    # QUICK INTENTS → start the right flow (never return bare "OK")
     intent = _INTENTS.quick_intent(user_message_norm)
     if intent == "Report incident":
-        # Start or continue the incident flow
-        result = bot.process_message("", user_id=user_id, context={"source": "web"})
-        # If process_message started a new flow, it'll return the opening prompt.
-        # If a flow already exists, it will continue.
-        if not result or not isinstance(result, dict) or not result.get("reply"):
-            # Fallback: explicitly start
-            result = bot.start_incident(user_id)
+        # Start/continue incident flow, return opening prompt
+        result = bot.start_incident(user_id)
         return jsonify(_fmt_bot(result)), 200
 
     elif intent == "Safety concern":
-        # Use the same incident flow; the event_type question will be asked.
+        # Start the same flow (event_type will be asked/prefilled if your bot does that)
         result = bot.start_incident(user_id)
         return jsonify(_fmt_bot(result)), 200
 
     elif intent == "Find SDS":
-        # Hand off to SDS flow in your UI
+        # Hand off to your SDS experience without a bland reply
         return jsonify({
             "type": "bot",
             "message": "Sure—what product or chemical are you looking for? You can also open the SDS page from the menu.",
@@ -130,7 +128,7 @@ def chat():
             "done": False
         }), 200
 
-    # DEFAULT: normal chat handling with the full bot reply
+    # DEFAULT: normal chat handling (surface bot's real reply)
     try:
         result = bot.process_message(user_message_norm or user_message, user_id=user_id, context={"source": "web"})
     except Exception as e:
