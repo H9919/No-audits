@@ -16,7 +16,7 @@ MAX_FREEFORM_LEN = 4000
 # ---------------------------------------------------------------------------
 # Centralized prompts
 PROMPTS: Dict[str, str] = {
-    # Basic Info (collected first)
+    # Basic Info
     "event_type": "What type of event is this? (Injury/Illness, Vehicle, Environmental, Depot Event, Property Damage, Security Concern, Other)",
     "when": "When did this happen? (YYYY-MM-DD HH:MM, or 'unknown')",
     "where": "Where did it happen? (site/facility and exact location)",
@@ -118,7 +118,7 @@ def _is_datetime(text: str) -> bool:
         return False
     if t.lower() == "unknown":
         return True
-    # YYYY-MM-DD or with time (space or T; : or - between HH and MM)
+    # YYYY-MM-DD or with time (space/T, : or -)
     if not re.fullmatch(r"\d{4}-\d{2}-\d{2}(?:[ T]\d{2}[:\-]\d{2})?", t):
         return False
     if len(t) > 10:
@@ -148,20 +148,18 @@ class Conversation:
     data: Dict[str, Any] = field(default_factory=dict)
     event_type: Optional[str] = None
     finished: bool = False
-    # light guards
-    last_key: Optional[str] = None
 
-_CONV: Dict[str, Conversation] = {}  # in-memory
+_CONV: Dict[str, Conversation] = {}  # in-memory store
 
 # ---------------------------------------------------------------------------
 # Event type aliases + single-choice guard
 _EVENT_ALIASES = {
     "Injury/Illness": ["injury/illness", "injury", "illness", "injuries"],
-    "Vehicle": ["vehicle", "vehichle", "vechicle", "vehicule", "vehichal"],
-    "Environmental": ["environmental", "environment", "spill"],
+    "Vehicle": ["vehicle", "vehichle", "vechicle", "vehicule", "vehichal", "car", "truck", "forklift", "accident"],
+    "Environmental": ["environmental", "environment", "spill", "spilled", "leak", "leaked"],
     "Depot Event": ["depot", "depot event"],
-    "Property Damage": ["property", "property damage"],
-    "Security Concern": ["security", "security concern"],
+    "Property Damage": ["property", "property damage", "damage", "cost"],
+    "Security Concern": ["security", "security concern", "theft", "trespass", "vandalism", "violence"],
     "Other": ["other"],
 }
 
@@ -172,15 +170,15 @@ def _canonicalize_choice(text: str, options: List[str]) -> Tuple[Optional[str], 
     parts = re.split(r"\s*(?:,|/|&|and)\s*", raw)
     hits: List[str] = []
     for p in parts:
-        # exact
+        matched = False
         for o in options:
             if p == o.lower():
-                hits.append(o); break
-        else:
-            # alias/typo
-            for canon, aliases in _EVENT_ALIASES.items():
-                if canon in options and p in aliases:
-                    hits.append(canon); break
+                hits.append(o); matched = True; break
+        if matched:
+            continue
+        for canon, aliases in _EVENT_ALIASES.items():
+            if canon in options and p in aliases:
+                hits.append(canon); matched = True; break
     hits = list(dict.fromkeys(hits))  # unique, ordered
     if len(hits) > 1:
         return None, f"Please choose exactly one of: {', '.join(options)} (you mentioned multiple: {', '.join(hits)})."
@@ -189,14 +187,58 @@ def _canonicalize_choice(text: str, options: List[str]) -> Tuple[Optional[str], 
     return None, f"Please choose exactly one of: {', '.join(options)}"
 
 # ---------------------------------------------------------------------------
-# Utilities
+# Heuristic extraction from first description
+_EVENT_OPTIONS = [
+    "Injury/Illness", "Vehicle", "Environmental", "Depot Event",
+    "Property Damage", "Security Concern", "Other"
+]
+
+_LOCATION_KEYWORDS = [
+    "garage", "warehouse", "workshop", "depot", "bay", "dock", "yard", "line",
+    "assembly", "plant", "shop", "lab", "laboratory", "office", "parking"
+]
+
+def _extract_from_description(text: str) -> Dict[str, Any]:
+    s = (text or "").strip()
+    low = s.lower()
+    found: Dict[str, Any] = {}
+
+    # Event types by keyword votes
+    votes = set()
+    if re.search(r"\binjur|broke|fractur|hospital", low):
+        votes.add("Injury/Illness")
+    if re.search(r"\bvehicle|car|truck|forklift|accident|collision", low):
+        votes.add("Vehicle")
+    if re.search(r"\bspill|leak|spilled|leaked|oil\b", low):
+        votes.add("Environmental")
+    if re.search(r"\bdamage|cost\b", low):
+        votes.add("Property Damage")
+    if re.search(r"\bsecurity|trespass|theft|vandal", low):
+        votes.add("Security Concern")
+
+    if len(votes) == 1:
+        found["event_type"] = list(votes)[0]
+    elif len(votes) > 1:
+        found["event_type_candidates"] = [v for v in _EVENT_OPTIONS if v in votes]
+
+    # Location keyword (best effort)
+    for kw in _LOCATION_KEYWORDS:
+        if re.search(rf"\b{re.escape(kw)}\b", low):
+            found["where"] = kw.capitalize()
+            break
+
+    return found
+
+# ---------------------------------------------------------------------------
+# Queue helpers (prevent repeats)
 def _skip_answered(convo: Conversation) -> None:
-    """Remove any already-answered fields from the front of the queue."""
     while convo.queue and convo.queue[0][0] in convo.data:
         convo.queue.pop(0)
 
+def _remove_from_queue(convo: Conversation, key: str) -> None:
+    convo.queue = [item for item in convo.queue if item[0] != key]
+
 def _dedupe_queue(convo: Conversation) -> None:
-    """Remove any *future* duplicates of keys already in data."""
     seen = set(convo.data.keys())
     new_q: List[Tuple[str, str, Optional[str], Optional[List[str]]]] = []
     for item in convo.queue:
@@ -210,12 +252,15 @@ def _dedupe_queue(convo: Conversation) -> None:
 class SmartEHSChatbot:
     """
     Chat-first flow:
-      1) Description → 2) When → 3) Where → 4) Event Type → Branch → 5 Whys + CAPA
+      1) Description → (extract & confirm)
+      2) When (datetime picker hint)
+      3) Where
+      4) Event Type → branch (buttons)
+      5) 5 Whys + CAPA
     """
 
     def __init__(self, logger=None):
         self.logger = logger
-        # Optional engines
         try:
             from services.severity import SeverityScorer  # optional
         except Exception:
@@ -224,7 +269,6 @@ class SmartEHSChatbot:
             from services.likelihood import LikelihoodScorer  # optional
         except Exception:
             LikelihoodScorer = None
-
         self.severity_scorer = SeverityScorer() if SeverityScorer else None
         self.likelihood_scorer = LikelihoodScorer() if LikelihoodScorer else None
         self.analytics = None  # optional hook
@@ -237,16 +281,14 @@ class SmartEHSChatbot:
             ("description", PROMPTS["description"], "nonempty", None),
             ("when", PROMPTS["when"], "datetime", None),
             ("where", PROMPTS["where"], "nonempty", None),
-            ("event_type", PROMPTS["event_type"], "nonempty", [
-                "Injury/Illness", "Vehicle", "Environmental", "Depot Event",
-                "Property Damage", "Security Concern", "Other"
-            ]),
+            ("event_type", PROMPTS["event_type"], "nonempty", _EVENT_OPTIONS),
         ]
         convo.queue.extend(basics)
         return {
             "reply": f"🚨 Incident Report\n\n{PROMPTS['description']}",
             "next_expected": "description",
             "done": False,
+            "ui": "textarea",
         }
 
     def process_message(self, text: str, user_id: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -256,9 +298,7 @@ class SmartEHSChatbot:
         convo = _CONV[user_id]
         text = (text or "").strip()
 
-        # Ensure we never re-ask answered fields
         _skip_answered(convo)
-
         if not convo.queue:
             return self._finalize(convo)
 
@@ -268,31 +308,29 @@ class SmartEHSChatbot:
         if validator:
             fn, msg = VALIDATORS.get(validator, (None, None))
             if fn and not fn(text):
-                return {"reply": f"⚠️ {msg or 'Invalid value.'}\n\n{prompt}", "next_expected": field_key, "done": False}
+                return self._make_prompt(field_key, f"⚠️ {msg or 'Invalid value.'}\n\n{prompt}", options, validator)
 
         if options and field_key != "event_type":
             t = (text or "").strip()
-            if not any(t.lower() == o.lower() for o in options):
+            if not any(t.lower() == o.lower() for o in (options or [])):
                 if STRICT_PDF_WORDING:
-                    return {"reply": f"⚠️ Please choose exactly one of: {', '.join(options)}\n\n{prompt}",
-                            "next_expected": field_key, "done": False}
+                    return self._make_prompt(field_key, f"⚠️ Please choose exactly one of: {', '.join(options)}\n\n{prompt}", options, validator)
 
         if not _len_ok(text):
-            return {"reply": f"⚠️ {VALIDATORS['lenok'][1]}\n\n{prompt}", "next_expected": field_key, "done": False}
+            return self._make_prompt(field_key, f"⚠️ {VALIDATORS['lenok'][1]}\n\n{prompt}", options, validator)
 
         # -------- Save value (with event_type canonicalization) --------
         value_to_save = text
         if options and field_key == "event_type":
             canon, emsg = _canonicalize_choice(text, options)
             if emsg:
-                return {"reply": f"⚠️ {emsg}\n\n{prompt}", "next_expected": field_key, "done": False}
+                # Re-prompt with **buttons** for clarity
+                return self._make_prompt(field_key, f"⚠️ {emsg}", options, validator)
             if canon:
                 value_to_save = canon
 
         convo.data[field_key] = value_to_save
         convo.queue.pop(0)
-        _dedupe_queue(convo)         # important: prevent asking same field again later
-        _skip_answered(convo)        # in case dedupe removed front items
 
         if self.analytics:
             try:
@@ -300,27 +338,79 @@ class SmartEHSChatbot:
             except Exception:
                 pass
 
-        # Branch when event_type captured
+        # -------- After capturing description: try to auto-fill and confirm --------
+        auto_suggest: Dict[str, Any] = {}
+        if field_key == "description":
+            inferred = _extract_from_description(value_to_save)
+            # If we confidently detected a location and it's not already set
+            if "where" in inferred and "where" not in convo.data:
+                convo.data["where"] = inferred["where"]
+                _remove_from_queue(convo, "where")
+                auto_suggest["where"] = inferred["where"]
+            # If exactly one event type inferred
+            if "event_type" in inferred and "event_type" not in convo.data:
+                convo.data["event_type"] = inferred["event_type"]
+                convo.event_type = inferred["event_type"]
+                _remove_from_queue(convo, "event_type")
+                auto_suggest["event_type"] = inferred["event_type"]
+                # Enqueue branch immediately
+                self._enqueue_branch(convo, inferred["event_type"])
+            # If multiple candidates, reorder event_type options to show the likely ones first
+            if "event_type_candidates" in inferred and not convo.event_type:
+                # Leave the field in the queue but include suggested candidates for UI emphasis
+                auto_suggest["event_type_candidates"] = inferred["event_type_candidates"]
+
+        # Deduplicate and skip any answered fields after auto-fill
+        _dedupe_queue(convo)
+        _skip_answered(convo)
+
+        # If we just captured event_type explicitly, enqueue branch
         if field_key == "event_type":
-            et = value_to_save.strip()
+            et = convo.data["event_type"].strip()
             convo.event_type = et
             self._enqueue_branch(convo, et)
             _dedupe_queue(convo)
             _skip_answered(convo)
 
-        # If queue now empty, enqueue 5 Whys + CAPA before finalize
+        # If queue empty, enqueue 5 Whys + CAPA before finalize
         if not convo.queue and not convo.finished:
             self._enqueue_root_cause_and_action(convo)
-            _dedupe_queue(convo)
 
         if not convo.queue:
             return self._finalize(convo)
 
-        next_key, next_prompt, _, _ = convo.queue[0]
-        convo.last_key = next_key
-        return {"reply": next_prompt, "next_expected": next_key, "done": False}
+        # Prompt next
+        next_key, next_prompt, next_validator, next_options = convo.queue[0]
+        # If we have auto suggestions, prepend a short summary before the next prompt
+        if auto_suggest:
+            summary_lines = []
+            if "where" in auto_suggest:
+                summary_lines.append(f"• Inferred location: **{auto_suggest['where']}**")
+            if "event_type" in auto_suggest:
+                summary_lines.append(f"• Inferred event type: **{auto_suggest['event_type']}**")
+            if "event_type_candidates" in auto_suggest:
+                cands = ", ".join(auto_suggest["event_type_candidates"])
+                summary_lines.append(f"• Likely event type(s): {cands}")
+            preface = "I pre-filled a few details from your description. You can correct me if needed.\n\n" + "\n".join(summary_lines) + "\n\n"
+            return self._make_prompt(next_key, preface + next_prompt, next_options, next_validator, suggestions=auto_suggest)
+
+        return self._make_prompt(next_key, next_prompt, next_options, next_validator)
 
     # ----------------- Internals -----------------
+    def _make_prompt(self, key: str, prompt: str, options: Optional[List[str]], validator: Optional[str], suggestions: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {"reply": prompt, "next_expected": key, "done": False}
+        if options:
+            payload["options"] = options  # your UI can render these as quick-reply buttons
+            payload["ui"] = "buttons"
+        if validator == "yesno":
+            payload.setdefault("options", ["Yes", "No"])
+            payload["ui"] = "buttons"
+        if key == "when":
+            payload["ui"] = "datetime"  # hint for date/time picker
+        if suggestions:
+            payload["suggested"] = suggestions  # to show pre-filled summary
+        return payload
+
     def _enqueue_branch(self, convo: Conversation, event_type: str) -> None:
         et = (event_type or "").strip()
         prompts: List[Tuple[str, str, Optional[str], Optional[List[str]]]] = []
