@@ -1,460 +1,198 @@
-# services/ehs_chatbot.py
-# Chat-first incident flow aligned to OSHA/AVOMO-style questions/branches.
-# Exposes: SmartEHSChatbot, SmartIntentClassifier, five_whys_manager
-# - Severity/Likelihood scorers are optional: if modules don't exist, bot still runs.
-# - Exact wording lives in PROMPTS; STRICT_PDF_WORDING enforces choice lists exactly.
+# routes/chatbot.py — original interface restored + fixed replies
+from flask import Blueprint, request, jsonify, render_template, current_app as app
+from pathlib import Path
+import time, json, logging, re
 
-from __future__ import annotations
-from dataclasses import dataclass, field
-from typing import Dict, Any, List, Optional, Tuple
-import datetime as dt
-import re
+from services.ehs_chatbot import SmartEHSChatbot, SmartIntentClassifier, five_whys_manager
+from services.capa_manager import CAPAManager
+from utils.uploads import is_allowed, save_upload
 
-# ---------------------------------------------------------------------------
-# Config
-STRICT_PDF_WORDING = True
-MAX_FREEFORM_LEN = 4000
+# Keep inputs as typed (avoid collapsing everything to a keyword)
+NORMALIZE_INPUTS = False
 
-# ---------------------------------------------------------------------------
-# Centralized prompts (edit here to keep 1:1 wording with your PDF)
-PROMPTS: Dict[str, str] = {
-    # Basic info
-    "event_type": "What type of event is this? (Injury/Illness, Vehicle, Environmental, Depot Event, Property Damage, Security Concern, Other)",
-    "when": "When did this happen? (YYYY-MM-DD HH:MM, or 'unknown')",
-    "where": "Where did it happen? (site/facility and exact location)",
-    "description": "Please describe what happened in detail. Include who was involved, what occurred, when it happened, and the sequence of events:",
+chatbot_bp = Blueprint("chatbot", __name__)
 
-    # Common follow-ups
-    "immediate_actions": "What immediate actions were taken?",
-    "witnesses": "List any witnesses (names and contact if known), or type 'None':",
-    "enablon_confirm": "Was an Enablon report submitted? (Yes/No)",
+_quick = SmartIntentClassifier()
+_CHATBOT = None
 
-    # Injury/Illness
-    "inj_name": "Injured/Ill Person — full name:",
-    "inj_job_title": "Job title:",
-    "inj_phone": "Phone number:",
-    "inj_address": "Home address:",
-    "inj_city": "City:",
-    "inj_state": "State/Province:",
-    "inj_zip": "ZIP/Postal code:",
-    "inj_status": "Employee status (Full time, Part time, Temporary, Contractor, Visitor, Other):",
-    "inj_dept": "Department (if applicable):",
-    "inj_supervisor": "Supervisor name (if applicable):",
-    "inj_body_part": "Body part affected:",
-    "inj_injury_type": "Injury type (e.g., Laceration, Strain, Burn, etc.):",
-    "inj_severity": "Injury severity (First Aid, Medical Treatment, Restricted Duty, Lost Time, Fatality):",
-    "inj_ppe": "PPE worn? (Yes/No and what PPE):",
-    "inj_treatment": "Initial treatment given (if any):",
-    "inj_law": "Was emergency service contacted? (Yes/No)",
-    "inj_law_details": "If contacted: agency, time called, report # / officer name (or 'N/A'):",
+def get_chatbot() -> SmartEHSChatbot:
+    global _CHATBOT
+    if _CHATBOT is None:
+        _CHATBOT = SmartEHSChatbot(logger=app.logger)
+        app.logger.info("SmartEHSChatbot initialized")
+    return _CHATBOT
 
-    # Vehicle
-    "veh_driver": "Vehicle Incident — driver/operator name:",
-    "veh_unit": "Vehicle or equipment involved (plate/unit/ID):",
-    "veh_damage": "Describe vehicle/equipment damage (if any):",
-    "veh_third_party": "Any third-party vehicle/person involved? (Yes/No)",
-    "veh_third_party_details": "If yes, provide details (name, contact, insurer, damage).",
-    "veh_photos": "Are photos/videos attached? (Yes/No)",
+def _normalize_intent_text(t: str) -> str:
+    """Optional soft normalization. Left off by default."""
+    if not NORMALIZE_INPUTS:
+        return t or ""
+    s = (t or "").strip().lower()
+    s = re.sub(r"[^\w\s/]+$", "", s)
+    if re.search(r"\breport( an)? incident\b|\bincident report\b|\bstart .*incident\b", s):
+        return "Report incident"
+    if re.search(r"\bsafety concern\b|\bnear miss\b|\bunsafe\b", s):
+        return "Safety concern"
+    if re.search(r"\b(find )?sds\b|\bsafety data sheet\b", s):
+        return "Find SDS"
+    return t
 
-    # Environmental
-    "env_involved_parties": "Environmental — involved parties (full names):",
-    "env_roles": "Who was involved (comma-separated): Full time, Part Time, Temporary, Contractor, Visitor, Other",
-    "spill_volume": "Spill volume (<1 gallon, >1 gallon, Unknown):",
-    "chemicals": "What chemical(s) were involved?",
-    "env_description": "Environmental spill event description:",
-    "env_corrective_action": "Immediate corrective action:",
-    "env_enablon_confirm": "Was an Enablon report submitted? (Yes/No)",
+def _user_id_from_req() -> str:
+    return f"{request.remote_addr}-{(request.headers.get('User-Agent','') or '')[:24]}"
 
-    # Depot
-    "depot_description": "Depot Event — what happened?",
-    "depot_immediate_actions": "Immediate actions taken:",
-    "depot_outcome_lessons": "Outcome & lessons learned (and what you'd do differently):",
+def _fmt_bot(result):
+    """
+    Normalize bot outputs for the UI.
+    Prefers 'reply'; bubbles next_expected/done/result if present.
+    """
+    out = {"type": "bot", "message": "", "done": False}
+    if isinstance(result, dict):
+        out["message"] = result.get("reply") or result.get("message") or ""
+        if "next_expected" in result:
+            out["next_expected"] = result["next_expected"]
+        if "done" in result:
+            out["done"] = bool(result["done"])
+        if result.get("done") and "result" in result:
+            out["result"] = result["result"]
+    else:
+        out["message"] = str(result)
+    if not out["message"]:
+        out["message"] = "Sorry—I'm not sure I caught that. Could you rephrase?"
+    return out
 
-    # Property Damage
-    "property_description": "Describe the property damage:",
-    "property_cost": "Approximate total cost of loss and repairs:",
-    "property_corrective_action": "Immediate corrective action taken:",
-    "property_enablon_confirm": "Was an Enablon report submitted? (Yes/No)",
+# ---------------- UI (restore original chat page) ----------------
+@chatbot_bp.route("/chat", methods=["GET", "POST"])
+def chat_interface():
+    # GET: show the real chat UI, not the placeholder dashboard
+    if request.method == "GET":
+        return render_template("chatbot.html")  # <— key change
 
-    # Security Concern
-    "security_event_types": "Type of Security Event (comma-separated): Theft, Trespassing, Vandalism, Workplace Violence/Threat, Other",
-    "security_description": "Security Concern description:",
-    "security_names_roles": "Name(s) and job title(s) or descriptions:",
-    "security_party_type": "Are they Employee(s), Visitor(s), Security Staff, Unknown Individual, or Other?",
-    "security_law": "Was law enforcement or emergency services contacted? (Yes/No)",
-    "security_law_details": "If contacted: agency, time called, report # or officer name (or 'N/A'):",
-    "security_footage": "Is security footage available? (Yes/No/N/A)",
-    "security_corrective_actions": "Corrective actions taken (e.g., site secured, access restricted):",
-    "security_enablon_confirm": "Was an Enablon report submitted? (Yes/No)",
+    # POST: process chat message
+    t0 = time.monotonic()
+    payload = request.get_json(silent=True) or {}
+    raw_msg = (request.form.get("message") or payload.get("message") or "").strip()
+    user_message = _normalize_intent_text(raw_msg)
+    user_id = (request.form.get("user_id") or payload.get("user_id") or _user_id_from_req()).strip()
+    uploaded_file = request.files.get("file") or request.files.get("upload")
 
-    # Other
-    "other_description": "Please describe the event:",
-    "other_actions": "Immediate actions taken:",
+    if not user_message and not uploaded_file:
+        return jsonify({"message": "Please type a message or attach a file.", "type": "error"}), 400
 
-    # 5 Whys + CAPA
-    "why1": "Why 1?",
-    "why2": "Why 2?",
-    "why3": "Why 3?",
-    "why4": "Why 4?",
-    "why5": "Why 5?",
-    "capa_action": "Corrective/Preventive Action (what will be done?):",
-    "capa_owner": "CAPA owner (person responsible):",
-    "capa_due": "CAPA due date (YYYY-MM-DD):",
-}
-
-# ---------------------------------------------------------------------------
-# Validators
-def _is_yes_no(text: str) -> bool:
-    return bool(re.fullmatch(r"(yes|no|y|n)\b", (text or "").strip().lower()))
-
-def _nonempty(text: str) -> bool:
-    return bool((text or "").strip())
-
-def _len_ok(text: str) -> bool:
-    return len(text or "") <= MAX_FREEFORM_LEN
-
-# Patched: accept YYYY-MM-DD, YYYY-MM-DD HH:MM (or 'T'), or 'unknown'
-def _is_datetime(text: str) -> bool:
-    t = (text or "").strip()
-    if not t:
-        return False
-    if t.lower() == "unknown":
-        return True
-    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2})?", t):
-        return False
+    # Lightweight intent for telemetry only
     try:
-        if len(t) == 10:
-            dt.date.fromisoformat(t)  # date only
-        else:
-            dt.datetime.strptime(t.replace("T", " "), "%Y-%m-%d %H:%M")
-        return True
+        intent, conf = _quick.classify_intent(user_message or raw_msg)
     except Exception:
-        return False
+        intent, conf = None, 0.0
 
-VALIDATORS: Dict[str, Tuple] = {
-    "yesno": (_is_yes_no, "Please answer Yes or No."),
-    "datetime": (_is_datetime, "Please provide a date/time (YYYY-MM-DD or YYYY-MM-DD HH:MM) or 'unknown'."),
-    "nonempty": (_nonempty, "This field is required."),
-    "lenok": (_len_ok, f"Text too long (>{MAX_FREEFORM_LEN} chars)."),
-}
-
-# ---------------------------------------------------------------------------
-# Conversation state
-@dataclass
-class Conversation:
-    user_id: str
-    queue: List[Tuple[str, str, Optional[str], Optional[List[str]]]] = field(default_factory=list)
-    data: Dict[str, Any] = field(default_factory=dict)
-    event_type: Optional[str] = None
-    finished: bool = False
-
-# Simple in-memory store (single-process)
-_CONV: Dict[str, Conversation] = {}
-
-# ---------------------------------------------------------------------------
-# SmartEHSChatbot
-class SmartEHSChatbot:
-    """
-    Chat-first incident flow:
-      1) Description
-      2) When
-      3) Where
-      4) Event Type → branch
-      5) 5 Whys + CAPA
-    """
-
-    def __init__(self, logger=None):
-        self.logger = logger
-
-        # Optional engines (safe to be None)
-        try:
-            from services.severity import SeverityScorer
-        except Exception:
-            SeverityScorer = None
-        try:
-            from services.likelihood import LikelihoodScorer
-        except Exception:
-            LikelihoodScorer = None
-
-        self.severity_scorer = SeverityScorer() if SeverityScorer else None
-        self.likelihood_scorer = LikelihoodScorer() if LikelihoodScorer else None
-
-        # Optional telemetry hook: callable(event, payload)
-        self.analytics = None
-
-    # ----------------- Public API -----------------
-    def start_incident(self, user_id: str) -> Dict[str, Any]:
-        convo = Conversation(user_id=user_id)
-        _CONV[user_id] = convo
-
-        # Order matches the opening prompt shown to the user
-        basics = [
-            ("description", PROMPTS["description"], "nonempty", None),
-            ("when", PROMPTS["when"], "datetime", None),
-            ("where", PROMPTS["where"], "nonempty", None),
-            ("event_type", PROMPTS["event_type"], "nonempty", [
-                "Injury/Illness", "Vehicle", "Environmental", "Depot Event",
-                "Property Damage", "Security Concern", "Other"
-            ]),
-        ]
-        convo.queue.extend(basics)
-
-        return {
-            "reply": f"🚨 Incident Report\n\n{PROMPTS['description']}",
-            "next_expected": "description",
-            "done": False,
-        }
-
-    def process_message(self, text: str, user_id: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        # Start if no active conversation or finished
-        if user_id not in _CONV or _CONV[user_id].finished:
-            return self.start_incident(user_id)
-
-        convo = _CONV[user_id]
-        text = (text or "").strip()
-
-        # If nothing left, finalize
-        if not convo.queue:
-            return self._finalize(convo)
-
-        field_key, prompt, validator, options = convo.queue[0]
-
-        # ---- VALIDATE (do NOT advance on failure) ----
-        ok, err = self._validate(field_key, text, validator, options)
-        if not ok:
-            return {
-                "reply": f"⚠️ {err}\n\n{prompt}",
-                "next_expected": field_key,
-                "done": False,
-            }
-
-        # ---- SAVE & ADVANCE (only on success) ----
-        convo.data[field_key] = text
-        convo.queue.pop(0)
-
-        # Optional analytics
-        if self.analytics:
+    # File ack path
+    if uploaded_file:
+        if is_allowed(uploaded_file.filename, getattr(uploaded_file, "mimetype", "")):
             try:
-                self.analytics("capture", {"user_id": user_id, "field": field_key})
-            except Exception:
-                pass
+                save_upload(uploaded_file, Path("data/tmp"))
+            except Exception as e:
+                app.logger.warning("file save failed: %s", e)
+            app.logger.info("chat:fast_file %.3fs", time.monotonic() - t0)
+            return jsonify({
+                "message": f"📎 Received your file: {uploaded_file.filename}. What would you like me to do with it?",
+                "type": "file_ack",
+                "intent": intent,
+                "confidence": conf
+            })
+        return jsonify({
+            "message": "This file type is not allowed. Please upload PDF/PNG/JPG/TXT.",
+            "type": "error"
+        }), 400
 
-        # Branch enqueue on event_type capture
-        if field_key == "event_type":
-            et = text.strip()
-            convo.event_type = et
-            self._enqueue_branch(convo, et)
+    # Delegate to stateful bot
+    bot = get_chatbot()
+    t1 = time.monotonic()
+    try:
+        result = bot.process_message(user_message, user_id=user_id, context={"source": "web"})
+    except Exception as e:
+        app.logger.exception("chat:bot_crash")
+        return jsonify({"message": f"Sorry—something went wrong handling that. ({e})", "type": "error"}), 500
 
-        # Enqueue 5 Whys + CAPA if now empty and not finished
-        if not convo.queue and not convo.finished:
-            self._enqueue_root_cause_and_action(convo)
+    app.logger.info("chat:smart %.3fs (total %.3fs)", time.monotonic() - t1, time.monotonic() - t0)
 
-        # Finalize if still empty
-        if not convo.queue:
-            return self._finalize(convo)
+    # Surface the bot's real reply to your UI
+    if isinstance(result, dict):
+        if "message" not in result:
+            if "reply" in result and isinstance(result["reply"], str) and result["reply"].strip():
+                result["message"] = result["reply"]
+            else:
+                result["message"] = "OK"
+        result.setdefault("type", "message")
+        result.setdefault("quick_intent", intent)
+        result.setdefault("quick_confidence", conf)
+        return jsonify(result)
 
-        # Otherwise prompt next
-        next_key, next_prompt, _, _ = convo.queue[0]
-        return {"reply": next_prompt, "next_expected": next_key, "done": False}
+    return jsonify({
+        "message": str(result),
+        "type": "message",
+        "quick_intent": intent,
+        "quick_confidence": conf
+    })
 
-    # ----------------- Internals -----------------
-    def _validate(self, key: str, text: str, validator: Optional[str], options: Optional[List[str]]) -> Tuple[bool, str]:
-        if validator:
-            fn, msg = VALIDATORS.get(validator, (None, None))
-            if fn and not fn(text):
-                return False, msg or "Invalid value."
-        if options:
-            t = (text or "").strip()
-            if not any(t.lower() == o.lower() for o in options):
-                if STRICT_PDF_WORDING:
-                    return False, f"Please choose exactly one of: {', '.join(options)}"
-        if not _len_ok(text):
-            return False, VALIDATORS["lenok"][1]
-        return True, ""
+# ---------------- 5 Whys ----------------
+@chatbot_bp.post("/five_whys/start")
+@chatbot_bp.post("/chat/five_whys/start")
+def five_whys_start():
+    problem = (request.form.get("problem") or request.json.get("problem") if request.is_json else "" or "").strip()
+    user_id = (request.form.get("user_id") or _user_id_from_req()).strip()
+    if not problem:
+        return jsonify({"ok": False, "error": "Please provide a problem statement."}), 400
+    five_whys_manager.start(user_id, problem)
+    return jsonify({"ok": True, "step": 1, "prompt": "Why 1?", "problem": problem})
 
-    def _enqueue_branch(self, convo: Conversation, event_type: str) -> None:
-        et = (event_type or "").strip()
-        prompts: List[Tuple[str, str, Optional[str], Optional[List[str]]]] = []
+@chatbot_bp.post("/five_whys/answer")
+@chatbot_bp.post("/chat/five_whys/answer")
+def five_whys_answer():
+    answer = (request.form.get("answer") or request.json.get("answer") if request.is_json else "" or "").strip()
+    user_id = (request.form.get("user_id") or _user_id_from_req()).strip()
+    incident_id = (request.form.get("incident_id") or "").strip()
+    force_complete = (request.form.get("complete") or "").lower() == "true"
 
-        if et == "Injury/Illness":
-            prompts = [
-                ("inj_name", PROMPTS["inj_name"], "nonempty", None),
-                ("inj_job_title", PROMPTS["inj_job_title"], "nonempty", None),
-                ("inj_phone", PROMPTS["inj_phone"], "nonempty", None),
-                ("inj_address", PROMPTS["inj_address"], "nonempty", None),
-                ("inj_city", PROMPTS["inj_city"], "nonempty", None),
-                ("inj_state", PROMPTS["inj_state"], "nonempty", None),
-                ("inj_zip", PROMPTS["inj_zip"], "nonempty", None),
-                ("inj_status", PROMPTS["inj_status"], "nonempty", None),
-                ("inj_dept", PROMPTS["inj_dept"], "nonempty", None),
-                ("inj_supervisor", PROMPTS["inj_supervisor"], "nonempty", None),
-                ("inj_body_part", PROMPTS["inj_body_part"], "nonempty", None),
-                ("inj_injury_type", PROMPTS["inj_injury_type"], "nonempty", None),
-                ("inj_severity", PROMPTS["inj_severity"], "nonempty", None),
-                ("inj_ppe", PROMPTS["inj_ppe"], "nonempty", None),
-                ("inj_treatment", PROMPTS["inj_treatment"], "nonempty", None),
-                ("inj_law", PROMPTS["inj_law"], "yesno", None),
-                ("inj_law_details", PROMPTS["inj_law_details"], "nonempty", None),
-                ("immediate_actions", PROMPTS["immediate_actions"], "nonempty", None),
-                ("witnesses", PROMPTS["witnesses"], "nonempty", None),
-                ("enablon_confirm", PROMPTS["enablon_confirm"], "yesno", None),
-            ]
+    sess = five_whys_manager.answer(user_id, answer)
+    if not sess:
+        return jsonify({"ok": False, "error": "No active 5-Whys session. Start first."}), 400
 
-        elif et == "Vehicle":
-            prompts = [
-                ("veh_driver", PROMPTS["veh_driver"], "nonempty", None),
-                ("veh_unit", PROMPTS["veh_unit"], "nonempty", None),
-                ("veh_damage", PROMPTS["veh_damage"], "nonempty", None),
-                ("veh_third_party", PROMPTS["veh_third_party"], "yesno", None),
-                ("veh_third_party_details", PROMPTS["veh_third_party_details"], "nonempty", None),
-                ("veh_photos", PROMPTS["veh_photos"], "yesno", None),
-                ("immediate_actions", PROMPTS["immediate_actions"], "nonempty", None),
-                ("witnesses", PROMPTS["witnesses"], "nonempty", None),
-                ("enablon_confirm", PROMPTS["enablon_confirm"], "yesno", None),
-            ]
-
-        elif et == "Environmental":
-            prompts = [
-                ("env_involved_parties", PROMPTS["env_involved_parties"], "nonempty", None),
-                ("env_roles", PROMPTS["env_roles"], "nonempty", None),
-                ("spill_volume", PROMPTS["spill_volume"], "nonempty", None),
-                ("chemicals", PROMPTS["chemicals"], "nonempty", None),
-                ("env_description", PROMPTS["env_description"], "nonempty", None),
-                ("env_corrective_action", PROMPTS["env_corrective_action"], "nonempty", None),
-                ("env_enablon_confirm", PROMPTS["env_enablon_confirm"], "yesno", None),
-                ("immediate_actions", PROMPTS["immediate_actions"], "nonempty", None),
-                ("witnesses", PROMPTS["witnesses"], "nonempty", None),
-            ]
-
-        elif et == "Depot Event":
-            prompts = [
-                ("depot_description", PROMPTS["depot_description"], "nonempty", None),
-                ("depot_immediate_actions", PROMPTS["depot_immediate_actions"], "nonempty", None),
-                ("depot_outcome_lessons", PROMPTS["depot_outcome_lessons"], "nonempty", None),
-                ("immediate_actions", PROMPTS["immediate_actions"], "nonempty", None),
-                ("witnesses", PROMPTS["witnesses"], "nonempty", None),
-                ("enablon_confirm", PROMPTS["enablon_confirm"], "yesno", None),
-            ]
-
-        elif et == "Property Damage":
-            prompts = [
-                ("property_description", PROMPTS["property_description"], "nonempty", None),
-                ("property_cost", PROMPTS["property_cost"], "nonempty", None),
-                ("property_corrective_action", PROMPTS["property_corrective_action"], "nonempty", None),
-                ("property_enablon_confirm", PROMPTS["property_enablon_confirm"], "yesno", None),
-                ("immediate_actions", PROMPTS["immediate_actions"], "nonempty", None),
-                ("witnesses", PROMPTS["witnesses"], "nonempty", None),
-            ]
-
-        elif et == "Security Concern":
-            prompts = [
-                ("security_event_types", PROMPTS["security_event_types"], "nonempty", None),
-                ("security_description", PROMPTS["security_description"], "nonempty", None),
-                ("security_names_roles", PROMPTS["security_names_roles"], "nonempty", None),
-                ("security_party_type", PROMPTS["security_party_type"], "nonempty", None),
-                ("security_law", PROMPTS["security_law"], "yesno", None),
-                ("security_law_details", PROMPTS["security_law_details"], "nonempty", None),
-                ("security_footage", PROMPTS["security_footage"], "nonempty", None),
-                ("security_corrective_actions", PROMPTS["security_corrective_actions"], "nonempty", None),
-                ("security_enablon_confirm", PROMPTS["security_enablon_confirm"], "yesno", None),
-                ("immediate_actions", PROMPTS["immediate_actions"], "nonempty", None),
-                ("witnesses", PROMPTS["witnesses"], "nonempty", None),
-            ]
-
-        else:  # Other
-            prompts = [
-                ("other_description", PROMPTS["other_description"], "nonempty", None),
-                ("other_actions", PROMPTS["other_actions"], "nonempty", None),
-                ("immediate_actions", PROMPTS["immediate_actions"], "nonempty", None),
-                ("witnesses", PROMPTS["witnesses"], "nonempty", None),
-                ("enablon_confirm", PROMPTS["enablon_confirm"], "yesno", None),
-            ]
-
-        convo.queue.extend(prompts)
-
-    def _enqueue_root_cause_and_action(self, convo: Conversation) -> None:
-        rc = [
-            ("why1", PROMPTS["why1"], "nonempty", None),
-            ("why2", PROMPTS["why2"], "nonempty", None),
-            ("why3", PROMPTS["why3"], "nonempty", None),
-            ("why4", PROMPTS["why4"], "nonempty", None),
-            ("why5", PROMPTS["why5"], "nonempty", None),
-            ("capa_action", PROMPTS["capa_action"], "nonempty", None),
-            ("capa_owner", PROMPTS["capa_owner"], "nonempty", None),
-            ("capa_due", PROMPTS["capa_due"], "nonempty", None),
-        ]
-        convo.queue.extend(rc)
-
-    def _finalize(self, convo: Conversation) -> Dict[str, Any]:
-        # Optional: compute severity/likelihood
+    done = five_whys_manager.is_complete(user_id) or force_complete
+    if done:
+        chain = sess["whys"]
         try:
-            if self.severity_scorer:
-                convo.data["computed_severity"] = self.severity_scorer.score(convo.data)
-            if self.likelihood_scorer:
-                convo.data["computed_likelihood"] = self.likelihood_scorer.score(convo.data)
+            DATA_DIR = Path("data")
+            INCIDENTS_JSON = DATA_DIR / "incidents.json"
+            if incident_id and INCIDENTS_JSON.exists():
+                items = json.loads(INCIDENTS_JSON.read_text())
+                if incident_id in items:
+                    items[incident_id]["root_cause_whys"] = chain
+                    INCIDENTS_JSON.write_text(json.dumps(items, indent=2))
         except Exception:
             pass
+        return jsonify({"ok": True, "complete": True, "whys": chain, "message": "5 Whys completed."})
+    next_step = len(sess.get("whys", [])) + 1
+    return jsonify({"ok": True, "complete": False, "prompt": f"Why {next_step}?", "progress": len(sess['whys'])})
 
-        convo.finished = True
-        payload = {
-            "ok": True,
-            "message": "✅ Incident captured. You can review and submit.",
-            "data": dict(convo.data),
-            "event_type": convo.event_type,
-            "completed": True,
-        }
-        return {
-            "reply": "Thanks. All required info captured. Do you want to submit now?",
-            "done": True,
-            "result": payload,
-        }
+# ---------------- CAPA suggestion ----------------
+@chatbot_bp.post("/capa/suggest")
+@chatbot_bp.post("/chat/capa/suggest")
+def capa_suggest():
+    desc = (request.form.get("description") or request.json.get("description") if request.is_json else "" or "").strip()
+    if not desc:
+        return jsonify({"ok": False, "error": "Please provide a short description."}), 400
+    mgr = CAPAManager()
+    res = mgr.suggest_corrective_actions(desc)
+    out = {"ok": True}
+    out.update(res)
+    return jsonify(out)
 
-# ---------------------------------------------------------------------------
-# Backward-compat: SmartIntentClassifier expected by routes
-class SmartIntentClassifier:
-    _INTENTS = [
-        ("Report incident", r"\breport( an)? incident\b|\bincident report\b|\bstart .*incident\b"),
-        ("Safety concern", r"\bsafety concern\b|\bnear miss\b|\bunsafe\b"),
-        ("Find SDS", r"\b(find )?sds\b|\bsafety data sheet\b"),
-        ("Risk assessment", r"\brisk assessment\b|\berc\b|\blikelihood\b"),
-        ("What's urgent?", r"\burgent\b|\bpriority\b|\boverdue\b"),
-        ("Help with this page", r"\btour\b|\bgetting started\b|\bguide\b|\bonboard\b"),
-    ]
+# ---------------- Session reset ----------------
+@chatbot_bp.post("/chat/reset")
+def chat_reset():
+    global _CHATBOT
+    _CHATBOT = None
+    return jsonify({"ok": True, "message": "Session reset."})
 
-    def quick_intent(self, text: str) -> str:
-        t = (text or "").lower().strip()
-        for label, pattern in self._INTENTS:
-            if re.search(pattern, t):
-                return label
-        return "Unknown"
-
-    def classify_intent(self, text: str) -> Tuple[str, float]:
-        t = (text or "").lower().strip()
-        for label, pattern in self._INTENTS:
-            if re.search(pattern, t):
-                return label, 0.95
-        return "Unknown", 0.0
-
-# ---------------------------------------------------------------------------
-# Backward-compat: five_whys_manager expected by routes
-class _FiveWhysManager:
-    def __init__(self):
-        self._sessions: Dict[str, Dict[str, Any]] = {}  # user_id -> {"problem": str, "whys": [str]}
-
-    def start(self, user_id: str, problem: str):
-        self._sessions[user_id] = {"problem": problem or "", "whys": []}
-
-    def answer(self, user_id: str, answer: str):
-        sess = self._sessions.setdefault(user_id, {"problem": "", "whys": []})
-        if answer:
-            sess["whys"].append(answer.strip())
-        return sess
-
-    def is_complete(self, user_id: str) -> bool:
-        sess = self._sessions.get(user_id)
-        return bool(sess and len(sess.get("whys", [])) >= 5)
-
-    def get(self, user_id: str):
-        return self._sessions.get(user_id)
-
-five_whys_manager = _FiveWhysManager()
+# ------------- Blueprint aliases (for dynamic loaders) -------------
+bp = chatbot_bp
+chatbot = chatbot_bp
+blueprint = chatbot_bp
