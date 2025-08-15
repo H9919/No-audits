@@ -1,13 +1,6 @@
 # services/ehs_chatbot.py
 # Chat-first incident flow aligned to AVOMO/OSHA-style questions/branches.
 # Exposes: SmartEHSChatbot, SmartIntentClassifier, five_whys_manager
-# Notes:
-# - Severity/Likelihood scorers are optional (lazy import). If the modules
-#   services.severity or services.likelihood are absent, the app still runs.
-# - This module keeps wording centralized in PROMPTS; set STRICT_PDF_WORDING=True
-#   to lock the bot to exact wording.
-# - Minimal, in-memory session state for a single-process deployment. If you run
-#   multiple workers, consider moving sessions to Redis/DB.
 
 from __future__ import annotations
 from dataclasses import dataclass, field
@@ -17,19 +10,19 @@ import re
 
 # ---------------------------------------------------------------------------
 # Config
-STRICT_PDF_WORDING = True  # keep prompts exactly as in PROMPTS
+STRICT_PDF_WORDING = True
 MAX_FREEFORM_LEN = 4000
 
 # ---------------------------------------------------------------------------
-# Centralized prompts — keep exact wording here when STRICT_PDF_WORDING=True
+# Centralized prompts
 PROMPTS: Dict[str, str] = {
-    # Basic Info (always captured first)
+    # Basic Info (collected first)
     "event_type": "What type of event is this? (Injury/Illness, Vehicle, Environmental, Depot Event, Property Damage, Security Concern, Other)",
     "when": "When did this happen? (YYYY-MM-DD HH:MM, or 'unknown')",
     "where": "Where did it happen? (site/facility and exact location)",
     "description": "Please describe what happened in detail. Include who was involved, what occurred, when it happened, and the sequence of events:",
 
-    # Generic follow-ups common to many branches
+    # Common follow-ups
     "immediate_actions": "What immediate actions were taken?",
     "witnesses": "List any witnesses (names and contact if known), or type 'None':",
     "enablon_confirm": "Was an Enablon report submitted? (Yes/No)",
@@ -108,9 +101,9 @@ PROMPTS: Dict[str, str] = {
 }
 
 # ---------------------------------------------------------------------------
-# Validation helpers
+# Validators
 def _is_yes_no(text: str) -> bool:
-    return bool(re.fullmatch(r"(yes|no|y|n)\b", (text or "").strip().lower()))
+    return bool(re.fullmatch(r"(?:yes|no|y|n)\b", (text or "").strip().lower()))
 
 def _nonempty(text: str) -> bool:
     return bool((text or "").strip())
@@ -125,28 +118,20 @@ def _is_datetime(text: str) -> bool:
         return False
     if t.lower() == "unknown":
         return True
-
-    # Allow:
-    #   YYYY-MM-DD
-    #   YYYY-MM-DD HH:MM  or YYYY-MM-DD HH-MM
-    #   YYYY-MM-DDTHH:MM or YYYY-MM-DDTHH-MM
+    # YYYY-MM-DD or with time (space or T; : or - between HH and MM)
     if not re.fullmatch(r"\d{4}-\d{2}-\d{2}(?:[ T]\d{2}[:\-]\d{2})?", t):
         return False
-
-    # Normalize HH-MM -> HH:MM for parsing
     if len(t) > 10:
-        t = re.sub(r"([ T]\d{2})-(\d{2})$", r"\1:\2", t)
-
+        t = re.sub(r"([ T]\d{2})-(\d{2})$", r"\1:\2", t)  # HH-MM -> HH:MM
     try:
         if len(t) == 10:
-            dt.date.fromisoformat(t)  # date only
+            dt.date.fromisoformat(t)
         else:
             dt.datetime.strptime(t.replace("T", " "), "%Y-%m-%d %H:%M")
         return True
     except Exception:
         return False
 
-# map symbolic validator name -> (callable, error_text)
 VALIDATORS: Dict[str, Tuple] = {
     "yesno": (_is_yes_no, "Please answer Yes or No."),
     "datetime": (_is_datetime, "Please provide a date/time (YYYY-MM-DD or YYYY-MM-DD HH:MM) or 'unknown'."),
@@ -155,7 +140,7 @@ VALIDATORS: Dict[str, Tuple] = {
 }
 
 # ---------------------------------------------------------------------------
-# Conversation State
+# Conversation state
 @dataclass
 class Conversation:
     user_id: str
@@ -163,12 +148,13 @@ class Conversation:
     data: Dict[str, Any] = field(default_factory=dict)
     event_type: Optional[str] = None
     finished: bool = False
+    # light guards
+    last_key: Optional[str] = None
 
-# Simple in-memory user -> Conversation
-_CONV: Dict[str, Conversation] = {}
+_CONV: Dict[str, Conversation] = {}  # in-memory
 
 # ---------------------------------------------------------------------------
-# Event type helpers (aliases + multi-choice guard)
+# Event type aliases + single-choice guard
 _EVENT_ALIASES = {
     "Injury/Illness": ["injury/illness", "injury", "illness", "injuries"],
     "Vehicle": ["vehicle", "vehichle", "vechicle", "vehicule", "vehichal"],
@@ -180,30 +166,22 @@ _EVENT_ALIASES = {
 }
 
 def _canonicalize_choice(text: str, options: List[str]) -> Tuple[Optional[str], Optional[str]]:
-    """
-    Returns (canonical_option or None, error_message or None).
-    - If multiple recognizable options provided (e.g., 'injury and vehicle'), return an error to pick one.
-    - If a close alias/typo matches, return the canonical option.
-    """
     raw = (text or "").strip().lower()
     if not raw:
         return None, "This field is required."
-
-    parts = re.split(r"\s*(?:,|/|&|and)\s*", raw)  # split obvious multi-choice inputs
+    parts = re.split(r"\s*(?:,|/|&|and)\s*", raw)
     hits: List[str] = []
     for p in parts:
-        matched = False
+        # exact
         for o in options:
             if p == o.lower():
-                hits.append(o); matched = True; break
-        if matched:
-            continue
-        for canon, aliases in _EVENT_ALIASES.items():
-            if canon in options and p in aliases:
-                hits.append(canon); matched = True; break
-
-    # Unique, ordered
-    hits = list(dict.fromkeys(hits))
+                hits.append(o); break
+        else:
+            # alias/typo
+            for canon, aliases in _EVENT_ALIASES.items():
+                if canon in options and p in aliases:
+                    hits.append(canon); break
+    hits = list(dict.fromkeys(hits))  # unique, ordered
     if len(hits) > 1:
         return None, f"Please choose exactly one of: {', '.join(options)} (you mentioned multiple: {', '.join(hits)})."
     if len(hits) == 1:
@@ -211,22 +189,33 @@ def _canonicalize_choice(text: str, options: List[str]) -> Tuple[Optional[str], 
     return None, f"Please choose exactly one of: {', '.join(options)}"
 
 # ---------------------------------------------------------------------------
-# Main Chatbot
+# Utilities
+def _skip_answered(convo: Conversation) -> None:
+    """Remove any already-answered fields from the front of the queue."""
+    while convo.queue and convo.queue[0][0] in convo.data:
+        convo.queue.pop(0)
+
+def _dedupe_queue(convo: Conversation) -> None:
+    """Remove any *future* duplicates of keys already in data."""
+    seen = set(convo.data.keys())
+    new_q: List[Tuple[str, str, Optional[str], Optional[List[str]]]] = []
+    for item in convo.queue:
+        if item[0] in seen:
+            continue
+        new_q.append(item)
+    convo.queue = new_q
+
+# ---------------------------------------------------------------------------
+# SmartEHSChatbot
 class SmartEHSChatbot:
     """
-    Chat-first incident flow:
-      1) Description
-      2) When
-      3) Where
-      4) Event Type
-      5) Branch questions
-      6) 5 Whys + CAPA fields
+    Chat-first flow:
+      1) Description → 2) When → 3) Where → 4) Event Type → Branch → 5 Whys + CAPA
     """
 
     def __init__(self, logger=None):
         self.logger = logger
-
-        # Optional engines. If modules are missing, keep None (safe no-op).
+        # Optional engines
         try:
             from services.severity import SeverityScorer  # optional
         except Exception:
@@ -238,15 +227,12 @@ class SmartEHSChatbot:
 
         self.severity_scorer = SeverityScorer() if SeverityScorer else None
         self.likelihood_scorer = LikelihoodScorer() if LikelihoodScorer else None
-
-        # Simple telemetry callback (optional; set externally)
-        self.analytics = None
+        self.analytics = None  # optional hook
 
     # ----------------- Public API -----------------
     def start_incident(self, user_id: str) -> Dict[str, Any]:
         convo = Conversation(user_id=user_id)
         _CONV[user_id] = convo
-        # Enqueue shared basics in the same order as the opening prompt
         basics = [
             ("description", PROMPTS["description"], "nonempty", None),
             ("when", PROMPTS["when"], "datetime", None),
@@ -264,21 +250,21 @@ class SmartEHSChatbot:
         }
 
     def process_message(self, text: str, user_id: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Main entry used by routes/chatbot.py"""
         if user_id not in _CONV or _CONV[user_id].finished:
             return self.start_incident(user_id)
 
         convo = _CONV[user_id]
         text = (text or "").strip()
 
-        # If queue empty but not finished, finalize
+        # Ensure we never re-ask answered fields
+        _skip_answered(convo)
+
         if not convo.queue:
             return self._finalize(convo)
 
-        # If expecting a field, validate & accept
         field_key, prompt, validator, options = convo.queue[0]
 
-        # Basic validation (do NOT pop on failure). Defer event_type option check to canonicalizer.
+        # -------- Validate current field (do NOT pop on failure) --------
         if validator:
             fn, msg = VALIDATORS.get(validator, (None, None))
             if fn and not fn(text):
@@ -294,7 +280,7 @@ class SmartEHSChatbot:
         if not _len_ok(text):
             return {"reply": f"⚠️ {VALIDATORS['lenok'][1]}\n\n{prompt}", "next_expected": field_key, "done": False}
 
-        # Save value (with canonicalization for event_type)
+        # -------- Save value (with event_type canonicalization) --------
         value_to_save = text
         if options and field_key == "event_type":
             canon, emsg = _canonicalize_choice(text, options)
@@ -305,8 +291,9 @@ class SmartEHSChatbot:
 
         convo.data[field_key] = value_to_save
         convo.queue.pop(0)
+        _dedupe_queue(convo)         # important: prevent asking same field again later
+        _skip_answered(convo)        # in case dedupe removed front items
 
-        # Optional analytics
         if self.analytics:
             try:
                 self.analytics("capture", {"user_id": user_id, "field": field_key})
@@ -318,35 +305,22 @@ class SmartEHSChatbot:
             et = value_to_save.strip()
             convo.event_type = et
             self._enqueue_branch(convo, et)
+            _dedupe_queue(convo)
+            _skip_answered(convo)
 
-        # If queue now empty, enqueue 5-Whys + CAPA before finalize
+        # If queue now empty, enqueue 5 Whys + CAPA before finalize
         if not convo.queue and not convo.finished:
             self._enqueue_root_cause_and_action(convo)
+            _dedupe_queue(convo)
 
-        # If still nothing left → finalize
         if not convo.queue:
             return self._finalize(convo)
 
-        # Prompt next
         next_key, next_prompt, _, _ = convo.queue[0]
+        convo.last_key = next_key
         return {"reply": next_prompt, "next_expected": next_key, "done": False}
 
     # ----------------- Internals -----------------
-    def _validate(self, key: str, text: str, validator: Optional[str], options: Optional[List[str]]) -> Tuple[bool, str]:
-        # (Kept for backward compatibility; process_message now does the checks inline to keep granularity.)
-        if validator:
-            fn, msg = VALIDATORS.get(validator, (None, None))
-            if fn and not fn(text):
-                return False, msg or "Invalid value."
-        if options and key != "event_type":  # event_type is handled by canonicalizer
-            t = (text or "").strip()
-            if not any(t.lower() == o.lower() for o in options):
-                if STRICT_PDF_WORDING:
-                    return False, f"Please choose exactly one of: {', '.join(options)}"
-        if not _len_ok(text):
-            return False, VALIDATORS["lenok"][1]
-        return True, ""
-
     def _enqueue_branch(self, convo: Conversation, event_type: str) -> None:
         et = (event_type or "").strip()
         prompts: List[Tuple[str, str, Optional[str], Optional[List[str]]]] = []
@@ -448,7 +422,6 @@ class SmartEHSChatbot:
         convo.queue.extend(prompts)
 
     def _enqueue_root_cause_and_action(self, convo: Conversation) -> None:
-        # 5 Whys + CAPA (always last)
         rc = [
             ("why1", PROMPTS["why1"], "nonempty", None),
             ("why2", PROMPTS["why2"], "nonempty", None),
@@ -462,14 +435,12 @@ class SmartEHSChatbot:
         convo.queue.extend(rc)
 
     def _finalize(self, convo: Conversation) -> Dict[str, Any]:
-        # Optional: compute severity/likelihood
         try:
             if self.severity_scorer:
                 convo.data["computed_severity"] = self.severity_scorer.score(convo.data)
             if self.likelihood_scorer:
                 convo.data["computed_likelihood"] = self.likelihood_scorer.score(convo.data)
         except Exception:
-            # non-fatal
             pass
 
         convo.finished = True
@@ -487,8 +458,7 @@ class SmartEHSChatbot:
         }
 
 # ---------------------------------------------------------------------------
-# Backward-compat shim: SmartIntentClassifier
-# routes/chatbot.py expects this to exist.
+# Backward-compat: SmartIntentClassifier
 class SmartIntentClassifier:
     _INTENTS = [
         ("Report incident", r"\breport( an)? incident\b|\bincident report\b|\bstart .*incident\b"),
@@ -498,15 +468,12 @@ class SmartIntentClassifier:
         ("What's urgent?", r"\burgent\b|\bpriority\b|\boverdue\b"),
         ("Help with this page", r"\btour\b|\bgetting started\b|\bguide\b|\bonboard\b"),
     ]
-
     def quick_intent(self, text: str) -> str:
         t = (text or "").lower().strip()
         for label, pattern in self._INTENTS:
             if re.search(pattern, t):
                 return label
         return "Unknown"
-
-    # Some routes call classify_intent; provide it too.
     def classify_intent(self, text: str) -> Tuple[str, float]:
         t = (text or "").lower().strip()
         for label, pattern in self._INTENTS:
@@ -515,24 +482,20 @@ class SmartIntentClassifier:
         return "Unknown", 0.0
 
 # ---------------------------------------------------------------------------
-# Backward-compat shim: five_whys_manager (very small in-memory session store)
+# Backward-compat: five_whys_manager
 class _FiveWhysManager:
     def __init__(self):
-        self._sessions: Dict[str, Dict[str, Any]] = {}  # user_id -> {"problem": str, "whys": [str]}
-
+        self._sessions: Dict[str, Dict[str, Any]] = {}
     def start(self, user_id: str, problem: str):
         self._sessions[user_id] = {"problem": problem or "", "whys": []}
-
     def answer(self, user_id: str, answer: str):
         sess = self._sessions.setdefault(user_id, {"problem": "", "whys": []})
         if answer:
             sess["whys"].append(answer.strip())
         return sess
-
     def is_complete(self, user_id: str) -> bool:
         sess = self._sessions.get(user_id)
         return bool(sess and len(sess.get("whys", [])) >= 5)
-
     def get(self, user_id: str):
         return self._sessions.get(user_id)
 
