@@ -1,235 +1,380 @@
 {% extends "base.html" %}
 {% block content %}
-<h3 class="mb-3">Edit Incident <code>{{ rec.id }}</code></h3>
-<div class="mb-2">
-  <span class="badge bg-info">Completeness: {{ completeness }}%</span>
-  {% if ok %}
-    <span class="badge bg-success">Valid ✔</span>
-  {% else %}
-    <span class="badge bg-warning text-dark">Missing: {{ ", ".join(missing) }}</span>
-  {% endif %}
-</div>
-<form method="post" class="card p-3">
+<h3 class="mb-3">Edit Incident</h3>
+
+<form method="post" class="card p-3" id="avomo-form-edit" action="{{ url_for('incidents.edit_incident', iid=item.id) }}">
+  <!-- Basic Information (Q1–Q5) -->
   <div class="mb-3">
-    <label class="form-label">Incident Type</label>
-    <select class="form-select" name="type">
-      {% for t in required_by_type.keys() %}
-      <option value="{{ t }}" {% if rec.type==t %}selected{% endif %}>{{ t }}</option>
+    <label class="form-label">Event Date <span class="text-danger">*</span></label>
+    <input type="date" class="form-control" name="event_date" value="{{ item.event_date|e }}" required>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Event Time (HHMM, e.g., 2345) <span class="text-danger">*</span></label>
+    <input type="text" class="form-control" name="event_time" pattern="^\\d{3,4}$" value="{{ item.event_time|e }}" placeholder="e.g., 0915" required>
+  </div>
+
+  <div class="row">
+    <div class="col-md-6 mb-3">
+      <label class="form-label">Name</label>
+      <input type="text" class="form-control" name="reporter_name" value="{{ item.reporter_name|e }}">
+    </div>
+    <div class="col-md-6 mb-3">
+      <label class="form-label">E-mail</label>
+      <input type="email" class="form-control" name="reporter_email" value="{{ item.reporter_email|e }}">
+    </div>
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label">Site <span class="text-danger">*</span></label>
+    <input class="form-control" name="site" value="{{ item.site|e }}" list="site-examples" required>
+    <datalist id="site-examples">
+      <option value="Austin Stassney"><option value="Atlanta Plymouth"><option value="Atlanta Manheim">
+    </datalist>
+  </div>
+
+  <!-- Q6 Severe criteria BEFORE Q7 Event Type -->
+  <div class="mb-3">
+    <label class="form-label">Does the event meet the severe event criteria? <span class="text-danger">*</span></label>
+    <select class="form-select" name="severe_event_flag" id="severe_event_flag">
+      <option value="">Select…</option>
+      <option value="yes" {% if (item.severe_event_flag or '') == 'yes' %}selected{% endif %}>Yes - This is a high severity event</option>
+      <option value="no"  {% if (item.severe_event_flag or '') == 'no' %}selected{% endif %}>No - This is not a high severity event</option>
+    </select>
+    <div class="form-text">
+      Answer “Yes” only if it relates to current operations/system configuration and could lead to (or caused): AV collision with 911 call or frame/internal damage; fatality/hospitalization/amputation/loss of eye; site-wide emergency (911); physical/cybersecurity breach; outage &gt; 15 minutes; chemical spill &gt; 1 gallon.
+    </div>
+  </div>
+
+  <!-- Q7 Event Type -->
+  <div class="mb-3">
+    <label class="form-label">Event Type <span class="text-danger">*</span></label>
+    <select class="form-select" name="event_type" id="event_type" required>
+      {% set et = (item.event_type or '') %}
+      {% for t in ["Safety Concern","Injury/Illness","Property Damage","Security Concern","Vehicle Collision","Environmental","Depot Event","Near Miss"] %}
+        <option {% if et==t %}selected{% endif %}>{{ t }}</option>
       {% endfor %}
     </select>
   </div>
-  {% for c in ["people","environment","cost","legal","reputation"] %}
-  <div class="mb-3">
-    <label class="form-label">{{ c|capitalize }}</label>
-    <textarea class="form-control" name="{{ c }}" rows="3">{{ rec.answers[c] }}</textarea>
-  </div>
-  {% endfor %}
-  
-  <div class="mb-3 form-check">
-    <input class="form-check-input" type="checkbox" name="anonymous" id="anon" {% if rec.anonymous %}checked{% endif %}>
-    <label class="form-check-label" for="anon">Anonymous Reporter</label>
-  </div>
-  <div class="row">
-    <div class="col-md-4 mb-3">
-      <label class="form-label">Facility / Site Code</label>
-      <input class="form-control" type="text" name="facility_code" value="{{ rec.facility_code }}">
+
+  <!-- Q8–Q9 Severe fields (show only if severe=yes) -->
+  <div id="severe_section" class="border rounded p-3 mb-3 d-none">
+    <div class="mb-3">
+      <label class="form-label">Severe Event Type <span class="text-danger">*</span></label>
+      {% set sevtype = (item.severe_event_type or '') %}
+      <select class="form-select" name="severe_event_type" id="severe_event_type">
+        <option value="">Select…</option>
+        {% for t in ["AV collision","Hospitalization or fatality","Site-wide emergency that requires calling 911","Physical security or Cybersecurity breach","Outage longer than 15 minutes","Chemical spill more than 1 gal"] %}
+        <option {% if sevtype==t %}selected{% endif %}>{{ t }}</option>
+        {% endfor %}
+      </select>
     </div>
-    <div class="col-md-4 mb-3">
-      <label class="form-label">Region</label>
-      <input class="form-control" type="text" name="region" value="{{ rec.region }}">
-    </div>
-  </div>
-  <div class="row">
-    <div class="col-md-4 mb-3">
-      <label class="form-label">Location Latitude</label>
-      <input class="form-control" type="text" name="location_lat" value="{{ rec.location_lat }}">
-    </div>
-    <div class="col-md-4 mb-3">
-      <label class="form-label">Location Longitude</label>
-      <input class="form-control" type="text" name="location_lng" value="{{ rec.location_lng }}">
-    </div>
-    <div class="col-md-4 mb-3">
-      <label class="form-label">Location (text)</label>
-      <input class="form-control" type="text" name="location_text" value="{{ rec.location_text }}">
+    <div class="mb-3">
+      <label class="form-label">Severe Event Description <span class="text-danger">*</span></label>
+      <textarea class="form-control" name="severe_event_description" rows="3">{{ item.severe_event_description|e }}</textarea>
     </div>
   </div>
 
-  <button class="btn btn-primary">Save & Validate</button>
+  <!-- Event-type sections (exact wording & order) -->
 
-    <!-- Reporter Details -->
-    <div class="card mt-3">
-      <div class="card-body">
-        <h5 class="card-title">Reporter Details</h5>
-        <div class="row g-3">
-          <div class="col-md-6">
-            <label class="form-label">Reporter Name</label>
-            <input type="text" class="form-control" name="reporter" id="reporter_name"
-                   value="{{ record.get('reporter','') }}" placeholder="Full name">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Reporter Contact (email or phone)</label>
-            <input type="text" class="form-control" name="reporter_contact" id="reporter_contact"
-                   value="{{ record.get('reporter_contact','') }}" placeholder="email@company.com / +1-555-1234">
-          </div>
-        </div>
-        <div class="form-text mt-2">If "Anonymous" is enabled, these details will be removed on save.</div>
-      </div>
+  <!-- Safety Concern (Q10–Q11) -->
+  <div id="sec_safety" class="etype d-none">
+    <div class="mb-3">
+      <label class="form-label">Safety Concern Description <span class="text-danger">*</span></label>
+      <textarea class="form-control" name="safety_description" rows="3">{{ item.safety_description|e }}</textarea>
     </div>
+    <div class="mb-3">
+      <label class="form-label">Safety Concern Corrective Action <span class="text-danger">*</span></label>
+      <textarea class="form-control" name="safety_corrective_action" rows="2">{{ item.safety_corrective_action|e }}</textarea>
+    </div>
+  </div>
 
-    <script>
-      (function() {
-        function syncAnon() {
-          var anon = document.querySelector('input[name="anonymous"]');
-          var name = document.getElementById('reporter_name');
-          var contact = document.getElementById('reporter_contact');
-          if (!anon || !name || !contact) return;
-          var hide = !!anon.checked;
-          name.disabled = hide; contact.disabled = hide;
-          if (hide) { name.value = ""; contact.value = ""; }
-          var card = name.closest('.card');
-          if (card) { card.style.opacity = hide ? '0.5' : '1'; }
-        }
-        document.addEventListener('change', function(e){
-          if (e.target && e.target.name === 'anonymous') syncAnon();
-        });
-        window.addEventListener('DOMContentLoaded', syncAnon);
-      })();
-    </script>
-    
-</form>
-  {% if rec.capa %}
-  <hr/>
-  <h5>CAPA Status</h5>
-  <form method="post" action="{{ url_for('incidents.incident_capa_status', iid=rec.id) }}">
+  <!-- Injury/Illness (Q12–Q27) -->
+  <div id="sec_injury" class="etype d-none">
     <div class="row">
-      <div class="col-md-3 mb-2">
-        <label class="form-label">Status</label>
-        <select class="form-select" name="status">
-          {% set st = rec.capa.status or 'open' %}
-          <option value="open" {% if st=='open' %}selected{% endif %}>Open</option>
-          <option value="in_progress" {% if st=='in_progress' %}selected{% endif %}>In Progress</option>
-          <option value="completed" {% if st=='completed' %}selected{% endif %}>Completed</option>
-        </select>
-      </div>
-      <div class="col-md-3 mb-2">
-        <label class="form-label">Assignee</label>
-        <input class="form-control" type="text" name="assignee" value="{{ rec.capa.assignee or '' }}">
-      </div>
-      <div class="col-md-3 mb-2">
-        <label class="form-label">Due Date</label>
-        <input class="form-control" type="date" name="due_date" value="{{ rec.capa.due_date or '' }}">
-      </div>
-      <div class="col-md-3 mb-2">
-        <label class="form-label">Priority</label>
-        <select class="form-select" name="priority">
-          {% set pr = (rec.capa.priority or 'medium') | lower %}
-          <option value="low" {% if pr=='low' %}selected{% endif %}>Low</option>
-          <option value="medium" {% if pr=='medium' %}selected{% endif %}>Medium</option>
-          <option value="high" {% if pr=='high' %}selected{% endif %}>High</option>
-          <option value="critical" {% if pr=='critical' %}selected{% endif %}>Critical</option>
-        </select>
-      </div>
+      <div class="col-md-6 mb-3"><label class="form-label">Injured Employee Name <span class="text-danger">*</span></label><input class="form-control" name="inj_name" value="{{ item.inj_name|e }}"></div>
+      <div class="col-md-6 mb-3"><label class="form-label">Injured Employee Job Title <span class="text-danger">*</span></label><input class="form-control" name="inj_job_title" value="{{ item.inj_job_title|e }}"></div>
     </div>
-    <div class="mb-2">
-      <label class="form-label">Comment</label>
-      <input class="form-control" type="text" name="comment" placeholder="Note for this status change">
+    <div class="row">
+      <div class="col-md-6 mb-3"><label class="form-label">Injured Employee Phone Number <span class="text-danger">*</span></label><input class="form-control" name="inj_phone" pattern="^\\d[\\d\\s\\-()+]*$" value="{{ item.inj_phone|e }}"></div>
+      <div class="col-md-6 mb-3"><label class="form-label">Injured Employee Address <span class="text-danger">*</span></label><input class="form-control" name="inj_address" value="{{ item.inj_address|e }}"></div>
     </div>
-    <div class="mb-2">
-      <label class="form-label">Updated By</label>
-      <input class="form-control" type="text" name="updated_by" placeholder="Your name/role">
+    <div class="row">
+      <div class="col-md-4 mb-3"><label class="form-label">Injured Employee City <span class="text-danger">*</span></label><input class="form-control" name="inj_city" value="{{ item.inj_city|e }}"></div>
+      <div class="col-md-4 mb-3"><label class="form-label">Injured Employee State <span class="text-danger">*</span></label><input class="form-control" name="inj_state" value="{{ item.inj_state|e }}"></div>
+      <div class="col-md-4 mb-3"><label class="form-label">Injured Employee Zip <span class="text-danger">*</span></label><input class="form-control" name="inj_zip" pattern="^\\d{4,10}$" value="{{ item.inj_zip|e }}"></div>
     </div>
-    <button class="btn btn-outline-primary">Update CAPA Status</button>
-
-  {% if capa_detail %}
-  <hr/>
-  <h5>CAPA History</h5>
-  <div class="list-group">
-    {% for u in (capa_detail.updates or [])|reverse %}
-    <div class="list-group-item">
-      <div class="d-flex justify-content-between">
-        <div>
-          <div class="small text-muted">{{ u.timestamp }}</div>
-          <div>{{ u.comment or "" }}</div>
-        </div>
-        <div class="text-end">
-          {% if u.status_change %}
-            <div class="badge bg-info">Status: {{ u.old_status }} → {{ u.new_status }}</div>
-          {% endif %}
-          {% if u.fields_changed %}
-            <div class="small text-muted">
-              {% for f in u.fields_changed %}
-                <div>{{ f.field }}: {{ f.old_value or "—" }} → {{ f.new_value or "—" }}</div>
-              {% endfor %}
-            </div>
-          {% endif %}
-        </div>
-      </div>
+    <div class="mb-3">
+      <label class="form-label">Employee Status <span class="text-danger">*</span></label>
+      {% set inj_status = (item.inj_status or '') %}
+      <select class="form-select" name="inj_status">
+        {% for t in ["Full time","Part Time","Temporary","Contractor","Visitor"] %}
+          <option {% if inj_status==t %}selected{% endif %}>{{ t }}</option>
+        {% endfor %}
+      </select>
     </div>
-    {% else %}
-    <div class="list-group-item text-muted">No CAPA updates yet.</div>
-    {% endfor %}
+    <div class="row">
+      <div class="col-md-6 mb-3"><label class="form-label">Supervisor Name <span class="text-danger">*</span></label><input class="form-control" name="supervisor_name" value="{{ item.supervisor_name|e }}"></div>
+      <div class="col-md-3 mb-3"><label class="form-label">Date Supervisor Was Notified <span class="text-danger">*</span></label><input type="date" class="form-control" name="supervisor_notified_date" value="{{ item.supervisor_notified_date|e }}"></div>
+      <div class="col-md-3 mb-3"><label class="form-label">Time Supervisor Was Notified (HHMM) <span class="text-danger">*</span></label><input class="form-control" name="supervisor_notified_time" pattern="^\\d{3,4}$" value="{{ item.supervisor_notified_time|e }}" placeholder="e.g., 1440"></div>
+    </div>
+    <div class="mb-3"><label class="form-label">Injury/Illness Event Description <span class="text-danger">*</span></label><textarea class="form-control" name="inj_event_description" rows="3">{{ item.inj_event_description|e }}</textarea></div>
+    <div class="mb-3">
+      <label class="form-label">Injury/Illness Type <span class="text-danger">*</span></label>
+      {% set injtype = (item.inj_type or '') %}
+      <select class="form-select" name="inj_type">
+        {% for t in ["Cut, Laceration, or Puncture","Burn","Fracture","Bruise/Contusion","Sprain or Strain","Dislocation","Crush Injury","Carpal Tunnel Syndrome","Tendonitis","Bursitis","Muscle Strain","Hearing Loss","Respiratory Condition","Skin Disorder","Heat Stress/Heat Stroke","Cold Stress - Frostbite/Hypothermia","Chemical Burn","Radiation Exposure","Electrical Shock","Biological Exposure"] %}
+        <option {% if injtype==t %}selected{% endif %}>{{ t }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="mb-3">
+      {% set inj_parts_selected = (item.inj_body_parts or '') .split(', ') %}
+      <label class="form-label">Affected Body Part(s) <span class="text-danger">*</span></label>
+      <select class="form-select" multiple name="inj_body_parts">
+        {% for t in ["Scalp","Skull","Eyes","Ears","Nose","Mouth","Teeth","Neck","Shoulders","Upper Back","Lower Back","Upper Arm","Elbow","Forearm","Wrist","Hand","Fingers","Torso","Chest","Ribs","Abdomen","Pelvis","Hips","Thighs","Knees","Lower Legs","Ankles","Feet","Toes"] %}
+        <option {% if t in inj_parts_selected %}selected{% endif %}>{{ t }}</option>
+        {% endfor %}
+      </select>
+      <div class="form-text">Hold Ctrl/Cmd to select multiple.</div>
+    </div>
+    <div class="mb-3"><label class="form-label">Injury/Illness Immediate Action Taken <span class="text-danger">*</span></label><textarea class="form-control" name="inj_immediate_action" rows="2">{{ item.inj_immediate_action|e }}</textarea></div>
+    <div class="mb-3"><label class="form-label">Confirm an Enablon Report was submitted to Waymo via go/waymo-enablon <span class="text-danger">*</span></label>
+      {% set c = (item.inj_enablon_confirm or '') %}
+      <select class="form-select" name="inj_enablon_confirm">
+        <option {% if c %}selected{% endif %}>Yes - a report has been submitted to Enablon</option>
+      </select>
+    </div>
   </div>
-  {% endif %}
 
-  
-    <!-- Reporter Details -->
-    <div class="card mt-3">
-      <div class="card-body">
-        <h5 class="card-title">Reporter Details</h5>
-        <div class="row g-3">
-          <div class="col-md-6">
-            <label class="form-label">Reporter Name</label>
-            <input type="text" class="form-control" name="reporter" id="reporter_name"
-                   value="{{ record.get('reporter','') }}" placeholder="Full name">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Reporter Contact (email or phone)</label>
-            <input type="text" class="form-control" name="reporter_contact" id="reporter_contact"
-                   value="{{ record.get('reporter_contact','') }}" placeholder="email@company.com / +1-555-1234">
-          </div>
+  <!-- Property Damage (Q28–Q31) -->
+  <div id="sec_property" class="etype d-none">
+    <div class="mb-3"><label class="form-label">Property Damage Event Description <span class="text-danger">*</span></label><textarea class="form-control" name="prop_description" rows="3">{{ item.prop_description|e }}</textarea></div>
+    <div class="mb-3"><label class="form-label">Approximate Total Cost of Loss & Repairs (number) <span class="text-danger">*</span></label><input class="form-control" name="prop_cost" pattern="^\\d+(\\.\\d+)?$" value="{{ item.prop_cost|e }}"></div>
+    <div class="mb-3"><label class="form-label">Property Damage Immediate Corrective Action Taken <span class="text-danger">*</span></label><textarea class="form-control" name="prop_corrective_action" rows="2">{{ item.prop_corrective_action|e }}</textarea></div>
+    <div class="mb-3"><label class="form-label">Confirm an Enablon Report was submitted to Waymo via go/waymo-enablon <span class="text-danger">*</span></label>
+      {% set c = (item.prop_enablon_confirm or '') %}
+      <select class="form-select" name="prop_enablon_confirm">
+        <option {% if c %}selected{% endif %}>Yes - a report has been submitted to Enablon</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Security Concern (Q32–Q40) -->
+  <div id="sec_security" class="etype d-none">
+    <div class="mb-3">
+      <label class="form-label">Type of Event (check one or more): <span class="text-danger">*</span></label>
+      {% set sel = (item.sec_types or '') .split('; ') %}
+      <div class="row row-cols-1 row-cols-md-2">
+        {% for t in ["Break-in / Forced Entry","Found Illicit Substance/Paraphernalia or Weapon in ADV","Found Sharps or Medication in ADV","Property Damage","Suspicious Activity","Theft","Trespassing","Vandalism","Workplace Violence / Threat","Other"] %}
+        <div class="form-check col mb-1">
+          <input class="form-check-input" type="checkbox" name="sec_types" value="{{t}}" id="sec_{{ loop.index }}" {% if t in sel %}checked{% endif %}>
+          <label class="form-check-label" for="sec_{{ loop.index }}">{{t}}</label>
         </div>
-        <div class="form-text mt-2">If "Anonymous" is enabled, these details will be removed on save.</div>
+        {% endfor %}
       </div>
     </div>
+    <div class="mb-3"><label class="form-label">Security Concern Event Description <span class="text-danger">*</span></label><textarea class="form-control" name="sec_description" rows="3">{{ item.sec_description|e }}</textarea></div>
+    <div class="mb-3"><label class="form-label">Name(s), job title(s), or description(s) <span class="text-danger">*</span></label><input class="form-control" name="sec_names" value="{{ item.sec_names|e }}"></div>
+    <div class="mb-3">
+      <label class="form-label">Are they: <span class="text-danger">*</span></label>
+      {% set aret = (item.sec_are_they or '') %}
+      <select class="form-select" name="sec_are_they">
+        {% for t in ["Employee(s)","Visitor(s)","Security Staff","Unknown Individual","Other"] %}
+        <option {% if aret==t %}selected{% endif %}>{{ t }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="mb-3"><label class="form-label">Was law enforcement or emergency services contacted? <span class="text-danger">*</span></label>
+      {% set law = (item.sec_law or '') %}
+      <select class="form-select" name="sec_law">
+        {% for t in ["Yes","No"] %}
+        <option {% if law==t %}selected{% endif %}>{{ t }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="mb-3"><label class="form-label">List agency, time called, and any report number or officer name (if known): <span class="text-danger">*</span></label><input class="form-control" name="sec_agency_details" value="{{ item.sec_agency_details|e }}"></div>
+    <div class="mb-3"><label class="form-label">Is security footage available? <span class="text-danger">*</span></label>
+      {% set sf = (item.sec_footage or '') %}
+      <select class="form-select" name="sec_footage">
+        {% for t in ["Yes","No","N/A or Unknown"] %}
+        <option {% if sf==t %}selected{% endif %}>{{ t }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="mb-3"><label class="form-label">Security Concern Corrective Actions Taken <span class="text-danger">*</span></label><textarea class="form-control" name="sec_corrective_action" rows="2">{{ item.sec_corrective_action|e }}</textarea></div>
+    <div class="mb-3"><label class="form-label">Confirm an Enablon Report was submitted to Waymo via go/waymo-enablon <span class="text-danger">*</span></label>
+      {% set c = (item.sec_enablon_confirm or '') %}
+      <select class="form-select" name="sec_enablon_confirm">
+        <option {% if c %}selected{% endif %}>Yes - a report has been submitted to Enablon</option>
+      </select>
+    </div>
+  </div>
 
-    <script>
-      (function() {
-        function syncAnon() {
-          var anon = document.querySelector('input[name="anonymous"]');
-          var name = document.getElementById('reporter_name');
-          var contact = document.getElementById('reporter_contact');
-          if (!anon || !name || !contact) return;
-          var hide = !!anon.checked;
-          name.disabled = hide; contact.disabled = hide;
-          if (hide) { name.value = ""; contact.value = ""; }
-          var card = name.closest('.card');
-          if (card) { card.style.opacity = hide ? '0.5' : '1'; }
-        }
-        document.addEventListener('change', function(e){
-          if (e.target && e.target.name === 'anonymous') syncAnon();
-        });
-        window.addEventListener('DOMContentLoaded', syncAnon);
-      })();
-    </script>
-    
-</form>
-  {% endif %}
+  <!-- Vehicle Collision (Q41–Q49) -->
+  <div id="sec_vehicle" class="etype d-none">
+    {% set loc = (item.collision_location or '') %}
+    <div class="mb-3"><label class="form-label">Where did the collision happen? <span class="text-danger">*</span></label>
+      <select class="form-select" name="collision_location">
+        {% for t in ["AVOMO Parking Lot/Facility","Public Road / While Traveling for work","Other"] %}
+        <option {% if loc==t %}selected{% endif %}>{{ t }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="mb-3"><label class="form-label">Involved Parties (Full Names) <span class="text-danger">*</span></label><input class="form-control" name="involved_parties" value="{{ item.involved_parties|e }}"></div>
+    <div class="mb-3"><label class="form-label">Which vehicle was involved? <span class="text-danger">*</span></label><input class="form-control" name="vehicle_identifier" value="{{ item.vehicle_identifier|e }}" placeholder='e.g., "ABC-123", Employee Van'></div>
+    <div class="mb-3"><label class="form-label">What did the Vehicle hit? <span class="text-danger">*</span></label><input class="form-control" name="vehicle_hit" value="{{ item.vehicle_hit|e }}" placeholder="e.g., another car, fence"></div>
+    <div class="mb-3"><label class="form-label">Was anyone injured? <span class="text-danger">*</span></label>
+      {% set ai = (item.collision_any_injury or '') %}
+      <select class="form-select" name="collision_any_injury">
+        {% for t in ["Yes","No"] %}
+        <option {% if ai==t %}selected{% endif %}>{{ t }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="mb-3"><label class="form-label">Was the Vehicle being operated manually or autonomously? <span class="text-danger">*</span></label>
+      {% set mode = (item.collision_mode or '') %}
+      <select class="form-select" name="collision_mode">
+        {% for t in ["Manually","Autonomously","Not Sure"] %}
+        <option {% if mode==t %}selected{% endif %}>{{ t }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="mb-3"><label class="form-label">Vehicle Collision Event Description <span class="text-danger">*</span></label><textarea class="form-control" name="collision_description" rows="3">{{ item.collision_description|e }}</textarea></div>
+    <div class="mb-3"><label class="form-label">Vehicle Collision Immediate Corrective Action Taken <span class="text-danger">*</span></label><textarea class="form-control" name="collision_corrective_action" rows="2">{{ item.collision_corrective_action|e }}</textarea></div>
+    <div class="mb-3"><label class="form-label">Confirm an Enablon Report was submitted to Waymo via go/waymo-enablon <span class="text-danger">*</span></label>
+      {% set c = (item.collision_enablon_confirm or '') %}
+      <select class="form-select" name="collision_enablon_confirm">
+        <option {% if c %}selected{% endif %}>Yes - a report has been submitted to Enablon</option>
+      </select>
+    </div>
+  </div>
 
-  {% if rec.capa %}
-  <div class="mb-3">
-    <label class="form-label">Corrective Actions</label>
-    {% if rec.capa.chosen %}
-      <ul>
-        {% for a in rec.capa.chosen %}<li>{{ a }}</li>{% endfor %}
-      </ul>
-      <div class="text-muted small">
-        Confidence: {{ rec.capa.confidence or "—" }} | Rationale: {{ rec.capa.rationale or "—" }}
+  <!-- Environmental (Q50–Q56) -->
+  <div id="sec_environmental" class="etype d-none">
+    <div class="mb-3"><label class="form-label">Involved Parties (Full Names) <span class="text-danger">*</span></label><input class="form-control" name="env_involved_parties" value="{{ item.env_involved_parties|e }}"></div>
+    <div class="mb-3">
+      <label class="form-label">Select what is applicable that was involved in the environmental event <span class="text-danger">*</span></label>
+      {% set envsel = (item.env_roles or '').split('; ') %}
+      <div class="row row-cols-1 row-cols-md-2">
+        {% for r in ["Full time Employees","Part Time Employees","Temporary Employees","Contractor Employees","Visitor","Other"] %}
+        <div class="form-check col mb-1">
+          <input class="form-check-input" type="checkbox" name="env_roles" value="{{r}}" id="envr_{{ loop.index }}" {% if r in envsel %}checked{% endif %}>
+          <label class="form-check-label" for="envr_{{ loop.index }}">{{r}}</label>
+        </div>
+        {% endfor %}
       </div>
-    {% else %}
-      <p class="text-muted">No corrective actions selected yet.</p>
+    </div>
+    <div class="mb-3"><label class="form-label">How large was the spill? <span class="text-danger">*</span></label>
+      {% set sv = (item.spill_volume or '') %}
+      <select class="form-select" name="spill_volume">
+        {% for t in ["Less than one (1) gallon","More than one (1) gallon","Unknown"] %}
+        <option {% if sv==t %}selected{% endif %}>{{ t }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="mb-3"><label class="form-label">What chemical(s) was involved in the spill? <span class="text-danger">*</span></label><input class="form-control" name="chemicals" value="{{ item.chemicals|e }}"></div>
+    <div class="mb-3"><label class="form-label">Environmental Spill Event Description <span class="text-danger">*</span></label><textarea class="form-control" name="env_description" rows="3">{{ item.env_description|e }}</textarea></div>
+    <div class="mb-3"><label class="form-label">Environmental Spill Immediate Corrective Action <span class="text-danger">*</span></label><textarea class="form-control" name="env_corrective_action" rows="2">{{ item.env_corrective_action|e }}</textarea></div>
+    <div class="mb-3"><label class="form-label">Confirm an Enablon Report was submitted to Waymo via go/waymo-enablon <span class="text-danger">*</span></label>
+      {% set c = (item.env_enablon_confirm or '') %}
+      <select class="form-select" name="env_enablon_confirm">
+        <option {% if c %}selected{% endif %}>Yes - a report has been submitted to Enablon</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Depot Event (Q57–Q59) -->
+  <div id="sec_depot" class="etype d-none">
+    <div class="mb-3"><label class="form-label">Event Description <span class="text-danger">*</span></label><textarea class="form-control" name="depot_description" rows="3">{{ item.depot_description|e }}</textarea></div>
+    <div class="mb-3"><label class="form-label">Immediate Actions Taken <span class="text-danger">*</span></label><textarea class="form-control" name="depot_actions" rows="2">{{ item.depot_actions|e }}</textarea></div>
+    <div class="mb-3"><label class="form-label">Outcome & Lessons Learned <span class="text-danger">*</span></label><textarea class="form-control" name="depot_outcome" rows="2">{{ item.depot_outcome|e }}</textarea></div>
+  </div>
+
+  <!-- Near Miss (Q60–Q62) -->
+  <div id="sec_near_miss" class="etype d-none">
+    <div class="mb-3">
+      <label class="form-label">Near Miss Type <span class="text-danger">*</span></label>
+      {% set ntype = (item.near_type or '') %}
+      <div class="d-flex gap-3 flex-wrap">
+        {% for t in ["Potential Injury","Potential Property Damage","Potential Environmental Damage","Potential Damage to Company Image"] %}
+        <div class="form-check">
+          <input class="form-check-input" type="radio" name="near_type" value="{{t}}" id="neart_{{ loop.index }}" {% if ntype==t %}checked{% endif %}>
+          <label class="form-check-label" for="neart_{{ loop.index }}">{{t}}</label>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="mb-3"><label class="form-label">Near Miss Description <span class="text-danger">*</span></label><textarea class="form-control" name="near_description" rows="3">{{ item.near_description|e }}</textarea></div>
+    <div class="mb-3"><label class="form-label">Near Miss Corrective Action <span class="text-danger">*</span></label><textarea class="form-control" name="near_corrective_action" rows="2">{{ item.near_corrective_action|e }}</textarea></div>
+  </div>
+
+  <!-- Root Cause & Corrective Actions (Q63–Q71) -->
+  <div class="border rounded p-3 mb-3">
+    <h5 class="mb-3">Root Cause Analysis (5 Whys)</h5>
+    <div class="row">
+      <div class="col-md-6 mb-3"><label class="form-label">First Why? <span class="text-danger">*</span></label><input class="form-control" name="why1" value="{{ item.why1|e }}"></div>
+      <div class="col-md-6 mb-3"><label class="form-label">Second Why? <span class="text-danger">*</span></label><input class="form-control" name="why2" value="{{ item.why2|e }}"></div>
+      <div class="col-md-6 mb-3"><label class="form-label">Third Why? <span class="text-danger">*</span></label><input class="form-control" name="why3" value="{{ item.why3|e }}"></div>
+      <div class="col-md-6 mb-3"><label class="form-label">Fourth Why? <span class="text-danger">*</span></label><input class="form-control" name="why4" value="{{ item.why4|e }}"></div>
+      <div class="col-md-6 mb-3"><label class="form-label">Fifth Why? <span class="text-danger">*</span></label><input class="form-control" name="why5" value="{{ item.why5|e }}"></div>
+    </div>
+    <div class="row">
+      <div class="col-md-6 mb-3"><label class="form-label">Corrective Action <span class="text-danger">*</span></label><input class="form-control" name="capa_action" value="{{ item.capa_action|e }}"></div>
+      <div class="col-md-6 mb-3"><label class="form-label">Action Owner Name <span class="text-danger">*</span></label><input class="form-control" name="capa_owner" value="{{ item.capa_owner|e }}"></div>
+      <div class="col-md-6 mb-3"><label class="form-label">Action Owner E-mail <span class="text-danger">*</span></label><input type="email" class="form-control" name="capa_owner_email" value="{{ item.capa_owner_email|e }}"></div>
+      <div class="col-md-6 mb-3"><label class="form-label">Due Date <span class="text-danger">*</span></label><input type="date" class="form-control" name="capa_due" value="{{ item.capa_due|e }}"></div>
+    </div>
+  </div>
+
+  <div class="d-flex align-items-center gap-2">
+    <button class="btn btn-primary">Save Changes</button>
+    {% if item.status %}
+      <span class="badge bg-{% if item.status == 'complete' %}success{% else %}warning text-dark{% endif %}">
+        {{ item.status|capitalize }}
+      </span>
     {% endif %}
   </div>
-  {% endif %}
-  <a class="btn btn-outline-secondary" href="{{ url_for('incidents.incident_capa', iid=rec.id) }}">Suggest & Confirm CAPA</a>
+</form>
 
+<script>
+(function(){
+  const eventTypeEl = document.getElementById('event_type');
+  const severeEl = document.getElementById('severe_event_flag');
+  const severeSection = document.getElementById('severe_section');
+
+  function showSection(id) {
+    document.querySelectorAll('.etype').forEach(x => x.classList.add('d-none'));
+    if (!id) return;
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('d-none');
+  }
+  function onTypeChange(){
+    const v = (eventTypeEl.value || '').toLowerCase();
+    const map = {
+      'safety concern':'sec_safety',
+      'injury/illness':'sec_injury',
+      'property damage':'sec_property',
+      'security concern':'sec_security',
+      'vehicle collision':'sec_vehicle',
+      'environmental':'sec_environmental',
+      'depot event':'sec_depot',
+      'near miss':'sec_near_miss'
+    };
+    showSection(map[v]);
+  }
+  function onSevereChange(){
+    const yes = (severeEl.value === 'yes');
+    severeSection.classList.toggle('d-none', !yes);
+    ['severe_event_type','severe_event_description'].forEach(n=>{
+      const el = document.getElementsByName(n)[0];
+      if (!el) return;
+      if (yes) el.setAttribute('required','required'); else { el.removeAttribute('required'); }
+    });
+  }
+
+  eventTypeEl.addEventListener('change', onTypeChange);
+  severeEl.addEventListener('change', onSevereChange);
+  window.addEventListener('DOMContentLoaded', ()=>{ onTypeChange(); onSevereChange(); });
+})();
+</script>
 {% endblock %}
