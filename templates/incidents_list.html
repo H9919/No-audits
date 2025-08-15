@@ -1,313 +1,64 @@
 {% extends "base.html" %}
 {% block content %}
-<h3 class="mb-3">New Incident</h3>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3 class="mb-0">Incidents</h3>
+  <a class="btn btn-primary" href="{{ url_for('incidents.new_incident') }}">New Incident</a>
+</div>
 
-<form method="post" class="card p-3" id="avomo-form">
-  <!-- Basic Information -->
-  <div class="mb-3">
-    <label class="form-label">Event Date <span class="text-danger">*</span></label>
-    <input type="date" class="form-control" name="event_date" required>
+{% if not items %}
+  <div class="alert alert-secondary">
+    No incidents yet. Click <strong>New Incident</strong> to create one.
   </div>
-  <div class="mb-3">
-    <label class="form-label">Event Time (HHMM, e.g., 2345) <span class="text-danger">*</span></label>
-    <input type="text" class="form-control" name="event_time" pattern="^\d{3,4}$" placeholder="e.g., 0915" required>
+{% else %}
+  <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Created</th>
+          <th>Event Date</th>
+          <th>Site</th>
+          <th>Type</th>
+          <th>Severe?</th>
+          <th>Status</th>
+          <th style="width:1%;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for it in items %}
+        <tr>
+          <td>{{ (it.created_ts or 0) | datetimeformat }}</td>
+          <td>{{ it.event_date or "—" }}</td>
+          <td>{{ it.site or "—" }}</td>
+          <td>{{ it.event_type or it.type or "—" }}</td>
+          <td>
+            {% set sev = (it.severe_event_flag or "") %}
+            {% if sev == "yes" %}
+              <span class="badge bg-danger">Yes</span>
+            {% elif sev == "no" %}
+              <span class="badge bg-secondary">No</span>
+            {% else %}
+              <span class="badge bg-light text-dark">—</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if it.status == "complete" %}
+              <span class="badge bg-success">Complete</span>
+            {% elif it.status == "incomplete" %}
+              <span class="badge bg-warning text-dark">Incomplete</span>
+            {% else %}
+              <span class="badge bg-light text-dark">Draft</span>
+            {% endif %}
+          </td>
+          <td>
+            <a class="btn btn-sm btn-outline-primary"
+               href="{{ url_for('incidents.edit_incident', iid=it.id) }}">
+              Edit
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
-
-  <div class="row">
-    <div class="col-md-6 mb-3">
-      <label class="form-label">Site <span class="text-danger">*</span></label>
-      <input type="text" class="form-control" name="site" placeholder="e.g., Atlanta Manheim" required>
-    </div>
-    <div class="col-md-6 mb-3">
-      <label class="form-label">Facility / Site Code (optional)</label>
-      <input class="form-control" type="text" name="facility_code">
-    </div>
-  </div>
-
-  <!-- Reporter (optional or auto-blanked if Anonymous) -->
-  <div class="mb-3 form-check">
-    <input class="form-check-input" type="checkbox" name="anonymous" id="anon">
-    <label class="form-check-label" for="anon">Anonymous Reporter</label>
-  </div>
-  <div class="row" id="reporter_block">
-    <div class="col-md-6 mb-3">
-      <label class="form-label">Reporter Name</label>
-      <input type="text" class="form-control" name="reporter" placeholder="Full name">
-    </div>
-    <div class="col-md-6 mb-3">
-      <label class="form-label">Reporter E-mail / Phone</label>
-      <input type="text" class="form-control" name="reporter_contact" placeholder="email@company.com / +1-555-1234">
-    </div>
-  </div>
-
-  <!-- Geo / Free text location (optional) -->
-  <div class="row">
-    <div class="col-md-4 mb-3">
-      <label class="form-label">Location Latitude</label>
-      <input class="form-control" type="text" name="location_lat">
-    </div>
-    <div class="col-md-4 mb-3">
-      <label class="form-label">Location Longitude</label>
-      <input class="form-control" type="text" name="location_lng">
-    </div>
-    <div class="col-md-4 mb-3">
-      <label class="form-label">Location (text)</label>
-      <input class="form-control" type="text" name="location_text" placeholder="e.g., Lot B, north gate">
-    </div>
-  </div>
-
-  <!-- Severe Event gate -->
-  <div class="mb-3">
-    <label class="form-label">Does the event meet the severe event criteria? <span class="text-danger">*</span></label>
-    <select class="form-select" name="severe_event_flag" id="severe_event_flag" required>
-      <option value="">Select…</option>
-      <option value="yes">Yes - This is a high severity event</option>
-      <option value="no">No - This is not a high severity event</option>
-    </select>
-    <div class="form-text">
-      Answer “Yes” only if it relates to current operations/system configuration and caused or could cause:
-      AV collision w/ emergency call or frame/internal damage; Fatality/hospitalization/amputation/loss of eye;
-      Site-wide emergency requiring 911; Physical/cybersecurity breach; System outage &gt; 15 minutes; Chemical spill &gt; 1 gallon.
-      :contentReference[oaicite:0]{index=0}
-    </div>
-  </div>
-
-  <div id="severe_section" class="border rounded p-3 mb-3 d-none">
-    <div class="mb-3">
-      <label class="form-label">Severe Event Type <span class="text-danger">*</span></label>
-      <select class="form-select" name="severe_event_type">
-        <option value="">Select…</option>
-        <option>AV collision</option>
-        <option>Hospitalization or fatality</option>
-        <option>Site-wide emergency that requires calling 911</option>
-        <option>Physical security or Cybersecurity breach</option>
-        <option>Outage longer than 15 minutes</option>
-        <option>Chemical spill more than 1 gal</option>
-      </select>
-    </div>
-    <div class="mb-3">
-      <label class="form-label">Severe Event Description <span class="text-danger">*</span></label>
-      <textarea class="form-control" name="severe_event_description" rows="3" placeholder="Key details: locations, timings, people/systems involved, actions taken…"></textarea>
-    </div>
-  </div>
-
-  <!-- Event Type switcher -->
-  <div class="mb-3">
-    <label class="form-label">Event Type <span class="text-danger">*</span></label>
-    <select class="form-select" name="event_type" id="event_type" required>
-      <option value="">Select…</option>
-      <option>Safety Concern</option>
-      <option>Injury/Illness</option>
-      <option>Property Damage</option>
-      <option>Security Concern</option>
-      <option>Vehicle Collision</option>
-      <option>Environmental</option>
-      <option>Depot Event</option>
-      <option>Near Miss</option>
-    </select>
-  </div>
-
-  <!-- Safety Concern -->
-  <div id="sec_safety" class="etype d-none">
-    <div class="mb-3">
-      <label class="form-label">Safety Concern Description <span class="text-danger">*</span></label>
-      <textarea class="form-control" name="safety_description" rows="3" placeholder="What did you see, and where did it happen?"></textarea>
-      <!-- PDF: “What did you see, and where did it happen?” --> :contentReference[oaicite:1]{index=1}
-    </div>
-    <div class="mb-3">
-      <label class="form-label">Safety Concern Corrective Action <span class="text-danger">*</span></label>
-      <textarea class="form-control" name="safety_corrective_action" rows="2" placeholder="What did you do or suggest to fix it?"></textarea>
-    </div>
-  </div>
-
-  <!-- Injury/Illness -->
-  <div id="sec_injury" class="etype d-none">
-    <div class="row">
-      <div class="col-md-6 mb-3"><label class="form-label">Injured Employee Name <span class="text-danger">*</span></label><input class="form-control" name="inj_name"></div>
-      <div class="col-md-6 mb-3"><label class="form-label">Job Title <span class="text-danger">*</span></label><input class="form-control" name="inj_job_title"></div>
-    </div>
-    <div class="row">
-      <div class="col-md-6 mb-3"><label class="form-label">Phone <span class="text-danger">*</span></label><input class="form-control" name="inj_phone"></div>
-      <div class="col-md-6 mb-3"><label class="form-label">Address <span class="text-danger">*</span></label><input class="form-control" name="inj_address"></div>
-    </div>
-    <div class="row">
-      <div class="col-md-4 mb-3"><label class="form-label">City <span class="text-danger">*</span></label><input class="form-control" name="inj_city"></div>
-      <div class="col-md-4 mb-3"><label class="form-label">State <span class="text-danger">*</span></label><input class="form-control" name="inj_state"></div>
-      <div class="col-md-4 mb-3"><label class="form-label">Zip <span class="text-danger">*</span></label><input class="form-control" name="inj_zip"></div>
-    </div>
-    <div class="mb-3">
-      <label class="form-label">Employee Status <span class="text-danger">*</span></label>
-      <select class="form-select" name="inj_status">
-        <option>Full time</option><option>Part Time</option><option>Temporary</option><option>Contractor</option><option>Visitor</option>
-      </select> <!-- :contentReference[oaicite:2]{index=2} -->
-    </div>
-    <div class="row">
-      <div class="col-md-6 mb-3"><label class="form-label">Supervisor Name <span class="text-danger">*</span></label><input class="form-control" name="supervisor_name"></div>
-      <div class="col-md-3 mb-3"><label class="form-label">Supervisor Notified (Date) <span class="text-danger">*</span></label><input type="date" class="form-control" name="supervisor_notified_date"></div>
-      <div class="col-md-3 mb-3"><label class="form-label">Supervisor Notified (Time, HHMM) <span class="text-danger">*</span></label><input class="form-control" name="supervisor_notified_time" placeholder="e.g., 1440"></div>
-    </div>
-    <div class="mb-3">
-      <label class="form-label">Injury/Illness Event Description <span class="text-danger">*</span></label>
-      <textarea class="form-control" name="inj_event_description" rows="3"></textarea>
-    </div>
-    <div class="mb-3">
-      <label class="form-label">Injury/Illness Type <span class="text-danger">*</span></label>
-      <select class="form-select" name="inj_type">
-        <option>Cut, Laceration, or Puncture</option><option>Burn</option><option>Fracture</option><option>Bruise/Contusion</option>
-        <option>Sprain or Strain</option><option>Dislocation</option><option>Crush Injury</option><option>Carpal Tunnel Syndrome</option>
-        <option>Tendonitis</option><option>Bursitis</option><option>Muscle Strain</option><option>Hearing Loss</option>
-        <option>Respiratory Condition</option><option>Skin Disorder</option><option>Heat Stress/Heat Stroke</option>
-        <option>Cold Stress - Frostbite/Hypothermia</option><option>Chemical Burn</option><option>Radiation Exposure</option>
-        <option>Electrical Shock</option><option>Biological Exposure</option>
-      </select> <!-- :contentReference[oaicite:3]{index=3} -->
-    </div>
-    <div class="mb-3">
-      <label class="form-label">Affected Body Part(s) <span class="text-danger">*</span></label>
-      <input class="form-control" name="inj_body_parts" placeholder="e.g., Left hand, Wrist">
-      <!-- List ref: Head/Neck/Back/Arm/Hand/Fingers/Torso/Legs/Feet… --> :contentReference[oaicite:4]{index=4}
-    </div>
-    <div class="mb-3">
-      <label class="form-label">Immediate Action Taken <span class="text-danger">*</span></label>
-      <textarea class="form-control" name="inj_immediate_action" rows="2"></textarea>
-    </div>
-    <div class="mb-3">
-      <label class="form-label">Confirm Enablon Report Submitted <span class="text-danger">*</span></label>
-      <select class="form-select" name="inj_enablon_confirm"><option>Yes - a report has been submitted to Enablon</option></select> <!-- :contentReference[oaicite:5]{index=5} -->
-    </div>
-  </div>
-
-  <!-- Property Damage -->
-  <div id="sec_property" class="etype d-none">
-    <div class="mb-3"><label class="form-label">Event Description <span class="text-danger">*</span></label><textarea class="form-control" name="prop_description" rows="3"></textarea></div>
-    <div class="mb-3"><label class="form-label">Approximate Total Cost of Loss & Repairs (number) <span class="text-danger">*</span></label><input class="form-control" name="prop_cost"></div>
-    <div class="mb-3"><label class="form-label">Immediate Corrective Action <span class="text-danger">*</span></label><textarea class="form-control" name="prop_corrective_action" rows="2"></textarea></div>
-    <div class="mb-3"><label class="form-label">Confirm Enablon Report Submitted <span class="text-danger">*</span></label><select class="form-select" name="prop_enablon_confirm"><option>Yes - a report has been submitted to Enablon</option></select></div> <!-- :contentReference[oaicite:6]{index=6} -->
-  </div>
-
-  <!-- Security Concern -->
-  <div id="sec_security" class="etype d-none">
-    <div class="mb-3">
-      <label class="form-label">Type of Event <span class="text-danger">*</span></label>
-      <input class="form-control" name="sec_types" placeholder="e.g., Theft; Suspicious Activity; Trespassing"> <!-- compact multi-entry -->
-      <!-- Options reference: Break-in/Forced Entry, Illicit Substance, Sharps/Medication, Property Damage, Suspicious Activity, Theft, Trespassing, Vandalism, Workplace Violence/Threat, Other. --> :contentReference[oaicite:7]{index=7}
-    </div>
-    <div class="mb-3"><label class="form-label">Event Description <span class="text-danger">*</span></label><textarea class="form-control" name="sec_description" rows="3"></textarea></div>
-    <div class="mb-3"><label class="form-label">Name(s), job title(s), or description(s) <span class="text-danger">*</span></label><input class="form-control" name="sec_names"></div>
-    <div class="mb-3"><label class="form-label">Are they (Employee/Visitor/Security/Unknown/Other)? <span class="text-danger">*</span></label><input class="form-control" name="sec_are_they"></div>
-    <div class="mb-3"><label class="form-label">Was law enforcement/emergency contacted? <span class="text-danger">*</span></label><select class="form-select" name="sec_law"><option>Yes</option><option>No</option></select></div>
-    <div class="mb-3"><label class="form-label">Agency / Time / Report # (if known) <span class="text-danger">*</span></label><input class="form-control" name="sec_agency_details"></div>
-    <div class="mb-3"><label class="form-label">Is security footage available? <span class="text-danger">*</span></label><select class="form-select" name="sec_footage"><option>Yes</option><option>No</option><option>N/A or Unknown</option></select></div>
-    <div class="mb-3"><label class="form-label">Corrective Actions Taken <span class="text-danger">*</span></label><textarea class="form-control" name="sec_corrective_action" rows="2" placeholder="e.g., site secured, access restricted, police called…"></textarea></div> <!-- :contentReference[oaicite:8]{index=8} -->
-    <div class="mb-3"><label class="form-label">Confirm Enablon Report Submitted <span class="text-danger">*</span></label><select class="form-select" name="sec_enablon_confirm"><option>Yes - a report has been submitted to Enablon</option></select></div>
-  </div>
-
-  <!-- Vehicle Collision -->
-  <div id="sec_vehicle" class="etype d-none">
-    <div class="mb-3"><label class="form-label">Where did the collision happen? <span class="text-danger">*</span></label><select class="form-select" name="collision_location"><option>AVOMO Parking Lot/Facility</option><option>Public Road / While Traveling for work</option><option>Other</option></select></div>
-    <div class="mb-3"><label class="form-label">Involved Parties (full names) <span class="text-danger">*</span></label><input class="form-control" name="involved_parties"></div>
-    <div class="mb-3"><label class="form-label">Which vehicle was involved? <span class="text-danger">*</span></label><input class="form-control" name="vehicle_identifier" placeholder='e.g., "ABC-123" or Employee Van'></div>
-    <div class="mb-3"><label class="form-label">What did the vehicle hit? <span class="text-danger">*</span></label><input class="form-control" name="vehicle_hit" placeholder="e.g., another car, fence"></div>
-    <div class="mb-3"><label class="form-label">Was anyone injured? <span class="text-danger">*</span></label><select class="form-select" name="collision_any_injury"><option>Yes</option><option>No</option></select></div>
-    <div class="mb-3"><label class="form-label">Was the vehicle operated manually or autonomously? <span class="text-danger">*</span></label><select class="form-select" name="collision_mode"><option>Manually</option><option>Autonomously</option><option>Not Sure</option></select></div>
-    <div class="mb-3"><label class="form-label">Event Description <span class="text-danger">*</span></label><textarea class="form-control" name="collision_description" rows="3"></textarea></div>
-    <div class="mb-3"><label class="form-label">Immediate Corrective Action <span class="text-danger">*</span></label><textarea class="form-control" name="collision_corrective_action" rows="2"></textarea></div>
-    <div class="mb-3"><label class="form-label">Confirm Enablon Report Submitted <span class="text-danger">*</span></label><select class="form-select" name="collision_enablon_confirm"><option>Yes - a report has been submitted to Enablon</option></select></div>
-  </div>
-
-  <!-- Environmental -->
-  <div id="sec_environmental" class="etype d-none">
-    <div class="mb-3"><label class="form-label">Involved Parties (full names) <span class="text-danger">*</span></label><input class="form-control" name="env_involved_parties"></div>
-    <div class="mb-3"><label class="form-label">Roles involved <span class="text-danger">*</span></label><input class="form-control" name="env_roles" placeholder="Full time / Part Time / Temp / Contractor / Visitor / Other"></div>
-    <div class="mb-3"><label class="form-label">Spill Volume <span class="text-danger">*</span></label><select class="form-select" name="spill_volume"><option>Less than one (1) gallon</option><option>More than one (1) gallon</option><option>Unknown</option></select></div>
-    <div class="mb-3"><label class="form-label">Chemical(s) involved <span class="text-danger">*</span></label><input class="form-control" name="chemicals"></div>
-    <div class="mb-3"><label class="form-label">Event Description <span class="text-danger">*</span></label><textarea class="form-control" name="env_description" rows="3"></textarea></div>
-    <div class="mb-3"><label class="form-label">Immediate Corrective Action <span class="text-danger">*</span></label><textarea class="form-control" name="env_corrective_action" rows="2"></textarea></div>
-    <div class="mb-3"><label class="form-label">Confirm Enablon Report Submitted <span class="text-danger">*</span></label><select class="form-select" name="env_enablon_confirm"><option>Yes - a report has been submitted to Enablon</option></select></div>
-  </div>
-
-  <!-- Depot Event -->
-  <div id="sec_depot" class="etype d-none">
-    <div class="mb-3"><label class="form-label">Event Description <span class="text-danger">*</span></label><textarea class="form-control" name="depot_description" rows="3"></textarea></div>
-    <div class="mb-3"><label class="form-label">Immediate Actions Taken <span class="text-danger">*</span></label><textarea class="form-control" name="depot_actions" rows="2"></textarea></div>
-    <div class="mb-3"><label class="form-label">Outcome & Lessons Learned <span class="text-danger">*</span></label><textarea class="form-control" name="depot_outcome" rows="2"></textarea></div> <!-- :contentReference[oaicite:9]{index=9} -->
-  </div>
-
-  <!-- Near Miss -->
-  <div id="sec_near_miss" class="etype d-none">
-    <div class="mb-3"><label class="form-label">Near Miss Type <span class="text-danger">*</span></label><input class="form-control" name="near_type" placeholder="Potential Injury / Property / Environmental / Company Image"></div>
-    <div class="mb-3"><label class="form-label">Description <span class="text-danger">*</span></label><textarea class="form-control" name="near_description" rows="3" placeholder="What did you see, and where?"></textarea></div>
-    <div class="mb-3"><label class="form-label">Corrective Action <span class="text-danger">*</span></label><textarea class="form-control" name="near_corrective_action" rows="2"></textarea></div> <!-- :contentReference[oaicite:10]{index=10} -->
-  </div>
-
-  <!-- Root Cause (5 Whys) & Corrective Action -->
-  <div class="border rounded p-3 mb-3">
-    <h5 class="mb-3">Root Cause Analysis (5 Whys)</h5>
-    <div class="row">
-      <div class="col-md-6 mb-3"><label class="form-label">First Why? <span class="text-danger">*</span></label><input class="form-control" name="why1"></div>
-      <div class="col-md-6 mb-3"><label class="form-label">Second Why? <span class="text-danger">*</span></label><input class="form-control" name="why2"></div>
-      <div class="col-md-6 mb-3"><label class="form-label">Third Why? <span class="text-danger">*</span></label><input class="form-control" name="why3"></div>
-      <div class="col-md-6 mb-3"><label class="form-label">Fourth Why? <span class="text-danger">*</span></label><input class="form-control" name="why4"></div>
-      <div class="col-md-6 mb-3"><label class="form-label">Fifth Why? <span class="text-danger">*</span></label><input class="form-control" name="why5"></div>
-    </div>
-    <!-- PDF guidance for 5 Whys --> :contentReference[oaicite:11]{index=11}
-    <div class="row">
-      <div class="col-md-6 mb-3"><label class="form-label">Corrective Action <span class="text-danger">*</span></label><input class="form-control" name="capa_action"></div>
-      <div class="col-md-6 mb-3"><label class="form-label">Action Owner Name <span class="text-danger">*</span></label><input class="form-control" name="capa_owner"></div>
-      <div class="col-md-6 mb-3"><label class="form-label">Action Owner E-mail <span class="text-danger">*</span></label><input class="form-control" name="capa_owner_email"></div>
-      <div class="col-md-6 mb-3"><label class="form-label">Due Date <span class="text-danger">*</span></label><input type="date" class="form-control" name="capa_due"></div>
-    </div> <!-- :contentReference[oaicite:12]{index=12} -->
-  </div>
-
-  <button class="btn btn-primary">Create Incident</button>
-</form>
-
-<script>
-(function(){
-  const eventTypeEl = document.getElementById('event_type');
-  const severeEl = document.getElementById('severe_event_flag');
-  const severeSection = document.getElementById('severe_section');
-  const anon = document.getElementById('anon');
-  const reporterBlock = document.getElementById('reporter_block');
-
-  function showSection(id) {
-    document.querySelectorAll('.etype').forEach(x => x.classList.add('d-none'));
-    if (!id) return;
-    const el = document.getElementById(id);
-    if (el) el.classList.remove('d-none');
-  }
-  function onTypeChange(){
-    const v = (eventTypeEl.value || '').toLowerCase();
-    const map = {
-      'safety concern':'sec_safety',
-      'injury/illness':'sec_injury',
-      'property damage':'sec_property',
-      'security concern':'sec_security',
-      'vehicle collision':'sec_vehicle',
-      'environmental':'sec_environmental',
-      'depot event':'sec_depot',
-      'near miss':'sec_near_miss'
-    };
-    showSection(map[v]);
-  }
-  function onSevereChange(){
-    const yes = (severeEl.value === 'yes');
-    severeSection.classList.toggle('d-none', !yes);
-  }
-  function onAnonChange(){
-    const hide = anon.checked;
-    reporterBlock.style.opacity = hide ? 0.5 : 1;
-    reporterBlock.querySelectorAll('input').forEach(i => {
-      i.disabled = hide;
-      if (hide) i.value = '';
-    });
-  }
-
-  eventTypeEl.addEventListener('change', onTypeChange);
-  severeEl.addEventListener('change', onSevereChange);
-  anon.addEventListener('change', onAnonChange);
-  window.addEventListener('DOMContentLoaded', ()=>{
-    onTypeChange(); onSevereChange(); onAnonChange();
-  });
-})();
-</script>
+{% endif %}
 {% endblock %}
