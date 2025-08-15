@@ -1,7 +1,7 @@
 # routes/chatbot.py — original interface restored + sticky session + fixed replies
 from flask import Blueprint, request, jsonify, render_template, current_app as app, make_response
 from pathlib import Path
-import time, json, logging, re, secrets
+import time, json, re, secrets
 
 from services.ehs_chatbot import SmartEHSChatbot, SmartIntentClassifier, five_whys_manager
 from services.capa_manager import CAPAManager
@@ -45,10 +45,8 @@ def _get_or_create_uid() -> str:
     return uid
 
 def _attach_uid_cookie(resp, uid: str):
-    try:
-        resp.set_cookie(COOKIE_NAME, uid, max_age=COOKIE_MAX_AGE, samesite="Lax", httponly=False)
-    except Exception:
-        pass
+    # Not HttpOnly so your front-end can read it if needed; keep SameSite=Lax.
+    resp.set_cookie(COOKIE_NAME, uid, max_age=COOKIE_MAX_AGE, samesite="Lax", httponly=False)
 
 def _fmt_bot(result):
     """
@@ -106,7 +104,6 @@ def chat_interface():
                 save_upload(uploaded_file, Path("data/tmp"))
             except Exception as e:
                 app.logger.warning("file save failed: %s", e)
-            app.logger.info("chat:fast_file %.3fs", time.monotonic() - t0)
             resp = jsonify({
                 "message": f"📎 Received your file: {uploaded_file.filename}. What would you like me to do with it?",
                 "type": "file_ack",
