@@ -156,6 +156,8 @@ def _is_number(s: str) -> bool:
     except Exception:
         return False
 
+from dataclasses import dataclass, field
+
 @dataclass
 class IncidentConversation:
     data: Dict[str, Any] = field(default_factory=lambda: {"attachments": []})
