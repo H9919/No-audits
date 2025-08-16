@@ -1,14 +1,54 @@
+# Core Flask dependencies
 Flask==3.0.3
 Werkzeug==3.0.3
+Jinja2==3.1.4
+MarkupSafe==2.1.5
+click==8.1.7
+blinker==1.8.2
+itsdangerous==2.2.0
+
+# Environment and configuration
 python-dotenv==1.0.1
-pymupdf==1.24.10
-qrcode==7.4.2
+
+# PDF processing and SDS functionality
+PyMuPDF==1.24.10
+fitz==0.0.1.dev2
+
+# QR code generation
+qrcode[pil]==7.4.2
 Pillow==10.4.0
+
+# Document processing
 markdown==3.6
 reportlab==4.2.2
-numpy==2.0.1
-gunicorn==21.2.0
 
-# Optional AI features (only if ENABLE_SBERT=true)
+# Data processing
+numpy==2.0.1
+
+# Web server for production
+gunicorn==22.0.0
+
+# Security and utilities
+cryptography==42.0.5
+six==1.16.0
+
+# Optional: Basic file handling
+pathlib2==2.3.7
+
+# Development and debugging (optional)
+# Uncomment for local development
+# flask-debugtoolbar==0.15.1
+
+# AI/ML features (commented out to save memory on Render free tier)
+# Uncomment these if you upgrade to a paid plan and want AI features
 # sentence-transformers==3.0.1
 # torch==2.5.1
+# transformers==4.40.0
+# scikit-learn==1.5.0
+
+# Additional utilities for enterprise features
+# Uncomment if needed
+# requests==2.32.3
+# python-dateutil==2.9.0
+# openpyxl==3.1.2
+# pandas==2.2.2
