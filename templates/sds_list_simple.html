@@ -1,0 +1,184 @@
+<!-- templates/sds_list_simple.html - Simplified version for debugging -->
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3><i class="bi bi-file-earmark-text text-success"></i> SDS Library (Simple)</h3>
+    <div>
+        <a href="{{ url_for('sds.sds_upload') }}" class="btn btn-primary">
+            <i class="bi bi-cloud-upload"></i> Upload SDS
+        </a>
+        <a href="/sds/debug" class="btn btn-outline-secondary">
+            <i class="bi bi-bug"></i> Debug
+        </a>
+    </div>
+</div>
+
+<!-- Simple Stats -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+                <h4>{{ sds_list|length }}</h4>
+                <small>Total SDS</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center">
+                <h4>{{ sds_list|selectattr("has_embeddings", "equalto", true)|list|length }}</h4>
+                <small>AI Searchable</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center">
+                <h4>{{ sds_list|map(attribute="department")|select|unique|list|length }}</h4>
+                <small>Departments</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body text-center">
+                <h4>0</h4>
+                <small>This Month</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Simple Table -->
+<div class="card">
+    <div class="card-header">
+        <h6 class="mb-0">SDS Files ({{ sds_list|length }} total)</h6>
+    </div>
+    <div class="card-body">
+        {% if sds_list %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Product Name</th>
+                        <th>Department</th>
+                        <th>Manufacturer</th>
+                        <th>Country</th>
+                        <th>File Info</th>
+                        <th>AI Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for sds in sds_list %}
+                    <tr>
+                        <td><code>{{ sds.id[:8] }}</code></td>
+                        <td>
+                            <strong>{{ sds.product_name }}</strong>
+                            {% if sds.chemical_info and sds.chemical_info.cas_numbers %}
+                            <br><small class="text-muted">
+                                CAS: {{ sds.chemical_info.cas_numbers[:2]|join(', ') }}
+                                {% if sds.chemical_info.cas_numbers|length > 2 %}
+                                    (+{{ sds.chemical_info.cas_numbers|length - 2 }} more)
+                                {% endif %}
+                            </small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if sds.department %}
+                                <span class="badge bg-info">{{ sds.department }}</span>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ sds.manufacturer or '—' }}</td>
+                        <td>
+                            {% if sds.country %}
+                                {{ sds.country }}
+                                {% if sds.state %}, {{ sds.state }}{% endif %}
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <small>
+                                {{ sds.file_name }}<br>
+                                {% if sds.file_size %}
+                                    {{ "%.1f"|format(sds.file_size / 1024 / 1024) }} MB
+                                {% else %}
+                                    Unknown size
+                                {% endif %}
+                            </small>
+                        </td>
+                        <td>
+                            {% if sds.has_embeddings %}
+                                <span class="badge bg-success">
+                                    <i class="bi bi-robot"></i> Indexed
+                                </span>
+                            {% else %}
+                                <span class="badge bg-secondary">
+                                    <i class="bi bi-robot"></i> Not indexed
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="/sds/{{ sds.id }}" class="btn btn-outline-primary" title="View">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                <a href="/sds/{{ sds.id }}/download" class="btn btn-outline-success" title="Download">
+                                    <i class="bi bi-download"></i>
+                                </a>
+                                {% if sds.has_embeddings %}
+                                <a href="/sds/{{ sds.id }}/chat" class="btn btn-outline-info" title="Chat">
+                                    <i class="bi bi-robot"></i>
+                                </a>
+                                {% endif %}
+                                <div class="btn-group">
+                                    <button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                                        <i class="bi bi-three-dots"></i>
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        <li><a class="dropdown-item" href="/sds/{{ sds.id }}/qr">
+                                            <i class="bi bi-qr-code"></i> QR Code
+                                        </a></li>
+                                        <li><a class="dropdown-item" href="/sds/{{ sds.id }}/label">
+                                            <i class="bi bi-tag"></i> Label
+                                        </a></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-file-earmark-text fs-1 text-muted"></i>
+            <h5 class="text-muted mt-3">No SDS Files Found</h5>
+            <p class="text-muted">Upload your first Safety Data Sheet to get started.</p>
+            <a href="{{ url_for('sds.sds_upload') }}" class="btn btn-primary">
+                <i class="bi bi-cloud-upload"></i> Upload First SDS
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Debug Info -->
+<div class="mt-4">
+    <div class="alert alert-info">
+        <h6><i class="bi bi-info-circle"></i> Debug Information</h6>
+        <p><strong>Template:</strong> sds_list_simple.html</p>
+        <p><strong>Records processed:</strong> {{ sds_list|length }}</p>
+        <p><strong>Status:</strong> This is a simplified version for debugging.</p>
+        <div class="mt-2">
+            <a href="/sds/debug" class="btn btn-sm btn-outline-secondary">View Debug Details</a>
+            <a href="/sds/simple" class="btn btn-sm btn-outline-primary">Ultra Simple View</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
