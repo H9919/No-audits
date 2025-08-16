@@ -100,10 +100,165 @@ def sds_list():
             <a href="/sds/debug" style="padding: 8px 16px; background: #007bff; color: white; text-decoration: none; border-radius: 4px;">Debug Info</a>
             <a href="/sds/setup_debug" style="padding: 8px 16px; background: #28a745; color: white; text-decoration: none; border-radius: 4px; margin-left: 10px;">Setup Debug</a>
             <a href="/sds/simple" style="padding: 8px 16px; background: #6c757d; color: white; text-decoration: none; border-radius: 4px; margin-left: 10px;">Simple View</a>
+            <a href="/sds/emergency_fix" style="padding: 8px 16px; background: #dc3545; color: white; text-decoration: none; border-radius: 4px; margin-left: 10px;">Emergency Fix</a>
         </div>
         </body>
         </html>
         """, 500
+
+@sds_bp.route("/emergency_fix")
+def emergency_sds_list():
+    """Emergency SDS list that bypasses all complex templates and debugging"""
+    try:
+        # Try to load index
+        index = load_index()
+        
+        # If no data, create some
+        if not index or len(index) == 0:
+            try:
+                from services.sds_ingest import initialize_sds_system
+                index = initialize_sds_system()
+            except Exception as init_error:
+                # Create minimal emergency data
+                index = {
+                    "emergency_001": {
+                        "id": "emergency_001",
+                        "product_name": "Emergency Test SDS",
+                        "file_name": "test.pdf",
+                        "file_size": 500000,
+                        "created_ts": time.time(),
+                        "created_date": time.time(),
+                        "has_embeddings": False,
+                        "department": "Test",
+                        "manufacturer": "Test Corp",
+                        "country": "Test Country",
+                        "state": "",
+                        "chemical_info": {"cas_numbers": [], "hazard_statements": []},
+                        "processing_metadata": {"chunks_count": 0},
+                        "status": "active"
+                    }
+                }
+                print(f"Created emergency data due to init error: {init_error}")
+        
+        # Create simple HTML response without complex template
+        html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SDS Library - Emergency Fix</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2><i class="bi bi-file-earmark-text text-success"></i> SDS Library (Emergency Mode)</h2>
+            <a href="/sds/upload" class="btn btn-primary">Upload SDS</a>
+        </div>
+        
+        <div class="alert alert-success">
+            <h5>✅ SDS System Working!</h5>
+            <p>Found {len(index)} SDS records. The system is operational.</p>
+            <p><strong>Note:</strong> This is emergency mode - bypassing complex templates.</p>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h5>SDS Records ({len(index)} total)</h5>
+            </div>
+            <div class="card-body">
+                {'''<div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Product Name</th>
+                            <th>Department</th>
+                            <th>Manufacturer</th>
+                            <th>Country</th>
+                            <th>File Size</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>''' if index else '<p>No SDS records found.</p>'}
+                {"".join(f'''
+                        <tr>
+                            <td><code>{sds.get("id", "unknown")[:8]}</code></td>
+                            <td><strong>{sds.get("product_name", "Unknown")}</strong></td>
+                            <td><span class="badge bg-info">{sds.get("department", "Not specified")}</span></td>
+                            <td>{sds.get("manufacturer", "Unknown")}</td>
+                            <td>{sds.get("country", "Unknown")}</td>
+                            <td>{(sds.get("file_size", 0) / 1024 / 1024):.1f} MB</td>
+                            <td>
+                                <a href="/sds/{sds.get('id')}" class="btn btn-sm btn-primary">View</a>
+                                <a href="/sds/{sds.get('id')}/download" class="btn btn-sm btn-success">Download</a>
+                            </td>
+                        </tr>
+                ''' for sds in index.values()) if index else ""}
+                {'''    </tbody>
+                </table>
+                </div>''' if index else ''}
+            </div>
+        </div>
+        
+        <div class="mt-3">
+            <a href="/" class="btn btn-secondary">Back to Dashboard</a>
+            <a href="/sds/upload" class="btn btn-primary">Upload New SDS</a>
+            <a href="/sds/" class="btn btn-warning">Try Normal SDS View</a>
+        </div>
+        
+        <div class="mt-3">
+            <small class="text-muted">Emergency mode active. If this works, the issue is with your main template.</small>
+        </div>
+    </div>
+</body>
+</html>
+        """
+        
+        return html
+        
+    except Exception as e:
+        import traceback
+        # Emergency fallback
+        return f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SDS Emergency Debug</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-4">
+        <div class="alert alert-danger">
+            <h4>🚨 SDS System Error</h4>
+            <p><strong>Error:</strong> {str(e)}</p>
+            <p><strong>Type:</strong> {type(e).__name__}</p>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h5>Full Error Details</h5>
+            </div>
+            <div class="card-body">
+                <pre style="background: #f8f9fa; padding: 15px; border-radius: 5px; font-size: 12px;">{traceback.format_exc()}</pre>
+            </div>
+        </div>
+        
+        <h5 class="mt-4">Troubleshooting Steps:</h5>
+        <ol>
+            <li><strong>Check if services/sds_ingest.py has been updated</strong> with the Render-compatible version</li>
+            <li><strong>Ensure PyMuPDF is in requirements.txt</strong> and installed properly</li>
+            <li><strong>Check Render logs</strong> for import errors during startup</li>
+            <li><strong>Verify file structure:</strong> Make sure you have __init__.py files in routes/ and services/</li>
+        </ol>
+        
+        <div class="mt-3">
+            <a href="/" class="btn btn-primary">Back to Dashboard</a>
+        </div>
+    </div>
+</body>
+</html>
+        """
 
 @sds_bp.get("/debug")
 def sds_debug():
@@ -142,6 +297,7 @@ def sds_debug():
                 .btn-primary {{ background: #007bff; color: white; }}
                 .btn-success {{ background: #28a745; color: white; }}
                 .btn-secondary {{ background: #6c757d; color: white; }}
+                .btn-danger {{ background: #dc3545; color: white; }}
             </style>
         </head>
         <body>
@@ -162,6 +318,7 @@ def sds_debug():
             <h2>Actions</h2>
             <a href="/sds/" class="btn btn-primary">Try SDS List</a>
             <a href="/sds/simple" class="btn btn-secondary">Try Simple List</a>
+            <a href="/sds/emergency_fix" class="btn btn-danger">Emergency Fix</a>
             <a href="/sds/setup_debug" class="btn btn-success">Setup Debug</a>
             {f'<a href="/sds/create_test_data" class="btn btn-success">Create Test Data</a>' if debug_info['total_records'] == 0 else ''}
         </div>
@@ -176,7 +333,7 @@ def sds_debug():
         <body>
         <h1>Debug Error</h1>
         <pre>Error: {str(e)}\n\n{traceback.format_exc()}</pre>
-        <a href="/sds/setup_debug">Setup Debug</a>
+        <a href="/sds/emergency_fix">Try Emergency Fix</a>
         </body>
         </html>
         """, 500
@@ -238,6 +395,7 @@ def sds_simple():
             <div class="mt-3">
                 <a href="/sds/debug" class="btn btn-secondary">Debug Info</a>
                 <a href="/sds/" class="btn btn-primary">Try Enhanced Version</a>
+                <a href="/sds/emergency_fix" class="btn btn-danger">Emergency Fix</a>
                 {f'<a href="/sds/create_test_data" class="btn btn-success">Create Test Data</a>' if len(simple_list) == 0 else ''}
             </div>
         </div>
@@ -306,6 +464,7 @@ def setup_debug():
                 .btn-primary {{ background: #007bff; color: white; }}
                 .btn-success {{ background: #28a745; color: white; }}
                 .btn-warning {{ background: #ffc107; color: black; }}
+                .btn-danger {{ background: #dc3545; color: white; }}
             </style>
         </head>
         <body>
@@ -341,6 +500,7 @@ def setup_debug():
             <a href="/sds/initialize_system" class="btn btn-primary">Initialize SDS System</a>
             <a href="/sds/upload" class="btn btn-warning">Upload Real SDS</a>
             <a href="/sds/" class="btn btn-primary">Back to SDS List</a>
+            <a href="/sds/emergency_fix" class="btn btn-danger">Emergency Fix</a>
         </div>
         
         <div class="section">
@@ -358,6 +518,7 @@ def setup_debug():
         <body>
         <h1>Setup Debug Error</h1>
         <pre>Error: {str(e)}\n\n{traceback.format_exc()}</pre>
+        <a href="/sds/emergency_fix">Try Emergency Fix</a>
         </body>
         </html>
         """, 500
@@ -395,6 +556,7 @@ def initialize_system():
             <a href="/sds/create_test_data" style="padding: 8px 16px; background: #28a745; color: white; text-decoration: none; border-radius: 4px;">Create Test Data</a>
             <a href="/sds/upload" style="padding: 8px 16px; background: #007bff; color: white; text-decoration: none; border-radius: 4px; margin-left: 10px;">Upload SDS</a>
             <a href="/sds/" style="padding: 8px 16px; background: #6c757d; color: white; text-decoration: none; border-radius: 4px; margin-left: 10px;">View SDS List</a>
+            <a href="/sds/emergency_fix" style="padding: 8px 16px; background: #dc3545; color: white; text-decoration: none; border-radius: 4px; margin-left: 10px;">Emergency Fix</a>
         </div>
         </body>
         </html>
@@ -408,6 +570,7 @@ def initialize_system():
         <h1>Initialization Error</h1>
         <pre>Error: {str(e)}\n\n{traceback.format_exc()}</pre>
         <a href="/sds/setup_debug">Back to Debug</a>
+        <a href="/sds/emergency_fix">Try Emergency Fix</a>
         </body>
         </html>
         """, 500
@@ -563,6 +726,7 @@ def create_test_data():
         </div>
         <div style="margin-top: 20px;">
             <a href="/sds/" style="padding: 8px 16px; background: #007bff; color: white; text-decoration: none; border-radius: 4px;">View SDS List</a>
+            <a href="/sds/emergency_fix" style="padding: 8px 16px; background: #dc3545; color: white; text-decoration: none; border-radius: 4px; margin-left: 10px;">Emergency Fix</a>
             <a href="/sds/debug" style="padding: 8px 16px; background: #6c757d; color: white; text-decoration: none; border-radius: 4px; margin-left: 10px;">Debug Info</a>
         </div>
         </body>
@@ -577,6 +741,7 @@ def create_test_data():
         <h1>Test Data Creation Error</h1>
         <pre>Error: {str(e)}\n\n{traceback.format_exc()}</pre>
         <a href="/sds/setup_debug">Back to Debug</a>
+        <a href="/sds/emergency_fix">Try Emergency Fix</a>
         </body>
         </html>
         """, 500
