@@ -1,4 +1,4 @@
-# app.py - FIXED VERSION with error handler properly placed
+# app.py - FIXED VERSION with additional debug routes
 import os
 import sys
 import json
@@ -32,15 +32,13 @@ def create_app():
     
     # Register blueprints with comprehensive error handling
     blueprint_configs = [
-
         ("routes.sds", "sds_bp", "/sds", "SDS"),
         ("routes.incidents", "incidents_bp", "/incidents", "Incidents"),
         ("routes.chatbot", "chatbot_bp", "/", "Enhanced Chatbot"),
         ("routes.capa", "capa_bp", "/capa", "CAPA"),
         ("routes.risk", "risk_bp", "/risk", "Risk Management"),
         ("routes.safety_concerns", "safety_concerns_bp", "/safety-concerns", "Safety Concerns"),
-    
-]
+    ]
     
     for module_name, blueprint_name, url_prefix, display_name in blueprint_configs:
         try:
@@ -59,6 +57,187 @@ def create_app():
             blueprint_errors.append(f"{display_name}: {str(e)}")
             create_fallback_routes(app, url_prefix, display_name)
     
+    # ADD DEBUG ROUTES HERE
+    @app.route('/debug/routes')
+    def debug_routes():
+        """Debug endpoint to check all registered routes"""
+        import urllib.parse
+        output = []
+        
+        output.append("<html><head><title>Route Debug</title></head><body>")
+        output.append("<h1>Registered Routes</h1>")
+        output.append("<style>table { border-collapse: collapse; width: 100%; }")
+        output.append("th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }")
+        output.append("th { background-color: #f2f2f2; }</style>")
+        
+        output.append("<table>")
+        output.append("<tr><th>Endpoint</th><th>Methods</th><th>URL Pattern</th><th>Blueprint</th></tr>")
+        
+        for rule in app.url_map.iter_rules():
+            options = {}
+            for arg in rule.arguments:
+                options[arg] = "[{0}]".format(arg)
+
+            methods = ','.join(rule.methods)
+            url = urllib.parse.unquote(rule.build(options))
+            blueprint = getattr(rule.endpoint, '__module__', '') or rule.endpoint.split('.')[0] if '.' in rule.endpoint else 'main'
+            
+            # Highlight SDS routes
+            row_style = 'style="background-color: #e6ffe6;"' if 'sds' in rule.endpoint else ''
+            
+            output.append(f"<tr {row_style}>")
+            output.append(f"<td>{rule.endpoint}</td>")
+            output.append(f"<td>{methods}</td>")
+            output.append(f"<td><code>{url}</code></td>")
+            output.append(f"<td>{blueprint}</td>")
+            output.append("</tr>")
+        
+        output.append("</table>")
+        
+        # Check for SDS routes specifically
+        sds_routes = [rule for rule in app.url_map.iter_rules() if 'sds' in rule.endpoint]
+        output.append(f"<h2>SDS Routes Found: {len(sds_routes)}</h2>")
+        
+        if sds_routes:
+            output.append("<ul>")
+            for route in sds_routes:
+                output.append(f"<li><a href='{route.rule}'>{route.endpoint}</a> - {route.rule}</li>")
+            output.append("</ul>")
+        else:
+            output.append("<div style='color: red; font-weight: bold;'>")
+            output.append("❌ No SDS routes found! The SDS blueprint may not be registered properly.")
+            output.append("</div>")
+        
+        output.append("<h2>Blueprint Status</h2>")
+        output.append(f"<p><strong>Loaded:</strong> {', '.join(blueprints_loaded)}</p>")
+        output.append(f"<p><strong>Errors:</strong> {', '.join(blueprint_errors) if blueprint_errors else 'None'}</p>")
+        
+        output.append("<h2>Quick Actions</h2>")
+        output.append("<a href='/sds/' style='padding: 8px 16px; background: #007bff; color: white; text-decoration: none; border-radius: 4px; margin: 5px;'>Try SDS List</a>")
+        output.append("<a href='/debug/sds-imports' style='padding: 8px 16px; background: #28a745; color: white; text-decoration: none; border-radius: 4px; margin: 5px;'>Check SDS Imports</a>")
+        output.append("<a href='/debug/sds-direct' style='padding: 8px 16px; background: #ffc107; color: black; text-decoration: none; border-radius: 4px; margin: 5px;'>Direct SDS Test</a>")
+        
+        output.append("</body></html>")
+        
+        return ''.join(output)
+
+    @app.route('/debug/sds-imports')
+    def debug_sds_imports():
+        """Check if SDS-related imports work"""
+        results = {}
+        
+        try:
+            from services.sds_ingest import load_index, save_index, sds_dir
+            results['sds_ingest'] = "✓ OK"
+        except Exception as e:
+            results['sds_ingest'] = f"❌ Error: {e}"
+        
+        try:
+            from services.sds_zip_ingest import ingest_zip
+            results['sds_zip_ingest'] = "✓ OK"
+        except Exception as e:
+            results['sds_zip_ingest'] = f"❌ Error: {e}"
+        
+        try:
+            from services.sds_qr import ensure_qr, sds_detail_url
+            results['sds_qr'] = "✓ OK"
+        except Exception as e:
+            results['sds_qr'] = f"❌ Error: {e}"
+        
+        try:
+            from services.sds_chat import answer_question_for_sds
+            results['sds_chat'] = "✓ OK"
+        except Exception as e:
+            results['sds_chat'] = f"❌ Error: {e}"
+        
+        try:
+            from routes.sds import sds_bp
+            results['sds_routes'] = "✓ OK"
+        except Exception as e:
+            results['sds_routes'] = f"❌ Error: {e}"
+        
+        html = "<html><head><title>SDS Import Debug</title></head><body>"
+        html += "<h1>SDS Import Status</h1>"
+        html += "<table style='border-collapse: collapse; width: 100%;'>"
+        html += "<tr style='background: #f2f2f2;'><th style='border: 1px solid #ddd; padding: 8px;'>Module</th><th style='border: 1px solid #ddd; padding: 8px;'>Status</th></tr>"
+        
+        for module, status in results.items():
+            color = "#e6ffe6" if "✓" in status else "#ffe6e6"
+            html += f"<tr style='background: {color};'>"
+            html += f"<td style='border: 1px solid #ddd; padding: 8px;'>{module}</td>"
+            html += f"<td style='border: 1px solid #ddd; padding: 8px;'>{status}</td>"
+            html += "</tr>"
+        
+        html += "</table>"
+        html += "<br><a href='/debug/routes'>Check Routes</a> | <a href='/debug/sds-direct'>Direct SDS Test</a>"
+        html += "</body></html>"
+        
+        return html
+
+    @app.route('/debug/sds-direct')
+    def debug_sds_direct():
+        """Direct test of SDS functionality"""
+        try:
+            # Try to import and call SDS functions directly
+            from services.sds_ingest import load_index, sds_dir
+            
+            # Check directory
+            dir_exists = sds_dir.exists()
+            
+            # Try to load index
+            index = load_index()
+            
+            html = f"""
+            <html>
+            <head><title>Direct SDS Test</title></head>
+            <body>
+            <h1>Direct SDS Test</h1>
+            <div style="background: #e6ffe6; padding: 15px; border: 1px solid #99ff99; border-radius: 5px; margin: 10px 0;">
+                <h3>✓ SDS Services Working</h3>
+                <p><strong>SDS Directory:</strong> {sds_dir} (Exists: {dir_exists})</p>
+                <p><strong>Index Records:</strong> {len(index)}</p>
+            </div>
+            
+            <h2>Actions</h2>
+            <a href="/sds/setup_debug" style="padding: 8px 16px; background: #007bff; color: white; text-decoration: none; border-radius: 4px; margin: 5px;">Setup Debug</a>
+            <a href="/sds/create_test_data" style="padding: 8px 16px; background: #28a745; color: white; text-decoration: none; border-radius: 4px; margin: 5px;">Create Test Data</a>
+            <a href="/sds/" style="padding: 8px 16px; background: #ffc107; color: black; text-decoration: none; border-radius: 4px; margin: 5px;">Try SDS List</a>
+            
+            {f'<div style="background: #fff3cd; padding: 15px; border: 1px solid #ffeaa7; border-radius: 5px; margin: 10px 0;"><h4>No SDS Data</h4><p>The SDS system is working but has no data. <a href="/sds/create_test_data">Create test data</a> first.</p></div>' if len(index) == 0 else ''}
+            </body>
+            </html>
+            """
+            
+            return html
+            
+        except Exception as e:
+            import traceback
+            error_details = traceback.format_exc()
+            
+            return f"""
+            <html>
+            <head><title>SDS Direct Test - Error</title></head>
+            <body>
+            <h1>SDS Direct Test - Error</h1>
+            <div style="background: #ffe6e6; padding: 15px; border: 1px solid #ff9999; border-radius: 5px;">
+                <h3>❌ Error</h3>
+                <p><strong>Error:</strong> {str(e)}</p>
+                <pre style="background: #f5f5f5; padding: 10px; border-radius: 3px;">{error_details}</pre>
+            </div>
+            
+            <h2>Suggested Actions</h2>
+            <ol>
+                <li>Check if services/sds_ingest.py exists</li>
+                <li>Ensure data/sds directory exists</li>
+                <li>Run initialization script</li>
+            </ol>
+            
+            <a href="/debug/sds-imports">Check Imports</a> | 
+            <a href="/debug/routes">Check Routes</a>
+            </body>
+            </html>
+            """
+
     # Core application routes
     @app.route("/")
     def index():
