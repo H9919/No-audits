@@ -65,11 +65,7 @@
     <a class="nav-item" href="/risk/register"><i class="bi bi-graph-up-arrow me-2"></i>Risk Register</a>
 
     <div class="p-2 small text-uppercase text-white-50 mt-2">Operations</div>
-    <a class="nav-item" href="/capa"><i class="bi bi-arrow-repeat me-2"></i>CAPAs</a>
-    <!-- FIXED: Changed from /sds to /sds/ -->
-    <a class="nav-item" href="/sds/"><i class="bi bi-file-earmark-text me-2"></i>SDS Library</a>
-    
-    <div class="stat mt-auto">
+    <a class="nav-item" href="/capa"><i class="bi bi-arrow-repeat me-2"></i>CAPAs</a><a class="nav-item" href="/sds"><i class="bi bi-file-earmark-text me-2"></i>SDS Library</a><div class="stat mt-auto">
       <div class="rowx"><span>Open Incidents</span><b id="openIncidents">0</b></div>
       <div class="rowx"><span>Overdue CAPAs</span><b id="overdueCapas">0</b></div>
       <div class="rowx"><span>Safety Concerns</span><b id="safetyConcerns">0</b></div>
@@ -128,14 +124,13 @@
             <div class="card-body d-flex gap-2 align-items-start"><div>📊</div>
               <div><b>Risk Assessment</b><div class="text-muted small">ERC/likelihood matrix</div></div></div>
           </div>
-          <!-- FIXED: Changed onclick to use /sds/ instead of just 'Find SDS' -->
-          <div class="card quick-card" onclick="window.location.href='/sds/'">
+          <div class="card quick-card" onclick="sendMessage('I need to find a safety data sheet')">
             <div class="card-body d-flex gap-2 align-items-start"><div>📋</div>
               <div><b>Find SDS</b><div class="text-muted small">Search & cite pages</div></div></div>
           </div>
           <div class="card quick-card" onclick="sendMessage('Show me what needs my attention today')">
             <div class="card-body d-flex gap-2 align-items-start"><div>⚡</div>
-              <div><b>What's Urgent?</b><div class="text-muted small">Overdue & priority</div></div></div>
+              <div><b>What’s Urgent?</b><div class="text-muted small">Overdue & priority</div></div></div>
           </div>
           <div class="card quick-card" onclick="sendMessage('Help me get started with the EHS system')">
             <div class="card-body d-flex gap-2 align-items-start"><div>🎯</div>
