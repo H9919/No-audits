@@ -1,4 +1,4 @@
-# app.py - RENDER-OPTIMIZED VERSION with SDS auto-initialization
+# app.py - RENDER-OPTIMIZED VERSION with SDS auto-initialization and Custom Jinja2 Filters
 import os
 import sys
 import json
@@ -40,6 +40,204 @@ def create_app():
     app = Flask(__name__)
     app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
     app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB max file size
+    
+    # ========================================
+    # CUSTOM JINJA2 FILTERS FOR SDS SYSTEM
+    # ========================================
+    
+    @app.template_filter('timestamp_to_date')
+    def timestamp_to_date(timestamp):
+        """Convert timestamp to MM/DD/YYYY format"""
+        try:
+            if isinstance(timestamp, (int, float)):
+                dt = datetime.fromtimestamp(timestamp / 1000 if timestamp > 1000000000000 else timestamp)
+            else:
+                dt = datetime.fromtimestamp(float(timestamp))
+            return dt.strftime('%m/%d/%Y')
+        except (ValueError, TypeError, OSError):
+            return 'Unknown'
+
+    @app.template_filter('relative_time')
+    def relative_time(timestamp):
+        """Convert timestamp to relative time (e.g., '2 days ago')"""
+        try:
+            now = datetime.now()
+            if isinstance(timestamp, (int, float)):
+                dt = datetime.fromtimestamp(timestamp / 1000 if timestamp > 1000000000000 else timestamp)
+            else:
+                dt = datetime.fromtimestamp(float(timestamp))
+            
+            diff = now - dt
+            days = diff.days
+            
+            if days == 0:
+                hours = diff.seconds // 3600
+                if hours == 0:
+                    minutes = diff.seconds // 60
+                    return f'{minutes} minutes ago' if minutes > 0 else 'Just now'
+                return f'{hours} hours ago'
+            elif days == 1:
+                return 'Yesterday'
+            elif days < 7:
+                return f'{days} days ago'
+            elif days < 30:
+                weeks = days // 7
+                return f'{weeks} week{"s" if weeks > 1 else ""} ago'
+            elif days < 365:
+                months = days // 30
+                return f'{months} month{"s" if months > 1 else ""} ago'
+            else:
+                years = days // 365
+                return f'{years} year{"s" if years > 1 else ""} ago'
+        except (ValueError, TypeError, OSError):
+            return 'Unknown'
+
+    @app.template_filter('format_file_size')
+    def format_file_size(size_bytes):
+        """Convert file size in bytes to human readable format"""
+        try:
+            size = float(size_bytes)
+            if size < 1024:
+                return f"{size:.0f} B"
+            elif size < 1024 * 1024:
+                return f"{size / 1024:.1f} KB"
+            elif size < 1024 * 1024 * 1024:
+                return f"{size / (1024 * 1024):.1f} MB"
+            else:
+                return f"{size / (1024 * 1024 * 1024):.1f} GB"
+        except (ValueError, TypeError):
+            return "Unknown"
+
+    @app.template_filter('hazard_level_color')
+    def hazard_level_color(level):
+        """Get Bootstrap color class for hazard level"""
+        color_map = {
+            'high': 'danger',
+            'medium': 'warning',
+            'low': 'success',
+            'unknown': 'secondary'
+        }
+        return color_map.get(str(level).lower(), 'secondary')
+
+    @app.template_filter('hazard_level_icon')
+    def hazard_level_icon(level):
+        """Get emoji icon for hazard level"""
+        icon_map = {
+            'high': '🔴',
+            'medium': '🟡',
+            'low': '🟢',
+            'unknown': '⚪'
+        }
+        return icon_map.get(str(level).lower(), '⚪')
+
+    @app.template_filter('country_flag')
+    def country_flag(country):
+        """Get flag emoji for country"""
+        flag_map = {
+            'United States': '🇺🇸',
+            'USA': '🇺🇸',
+            'US': '🇺🇸',
+            'Canada': '🇨🇦',
+            'CA': '🇨🇦',
+            'United Kingdom': '🇬🇧',
+            'UK': '🇬🇧',
+            'GB': '🇬🇧',
+            'Germany': '🇩🇪',
+            'DE': '🇩🇪',
+            'France': '🇫🇷',
+            'FR': '🇫🇷',
+            'Japan': '🇯🇵',
+            'JP': '🇯🇵',
+            'China': '🇨🇳',
+            'CN': '🇨🇳',
+            'Australia': '🇦🇺',
+            'AU': '🇦🇺',
+            'Mexico': '🇲🇽',
+            'MX': '🇲🇽',
+            'Brazil': '🇧🇷',
+            'BR': '🇧🇷',
+            'India': '🇮🇳',
+            'IN': '🇮🇳',
+            'Italy': '🇮🇹',
+            'IT': '🇮🇹',
+            'Spain': '🇪🇸',
+            'ES': '🇪🇸',
+            'Netherlands': '🇳🇱',
+            'NL': '🇳🇱',
+            'Switzerland': '🇨🇭',
+            'CH': '🇨🇭',
+            'Sweden': '🇸🇪',
+            'SE': '🇸🇪',
+            'Norway': '🇳🇴',
+            'NO': '🇳🇴',
+            'Denmark': '🇩🇰',
+            'DK': '🇩🇰'
+        }
+        return flag_map.get(str(country), '🌍')
+
+    @app.template_filter('truncate_smart')
+    def truncate_smart(text, length=30):
+        """Smart truncation that tries to break at word boundaries"""
+        try:
+            if not text or len(str(text)) <= length:
+                return text
+            
+            text_str = str(text)
+            # Try to break at a word boundary
+            truncated = text_str[:length]
+            last_space = truncated.rfind(' ')
+            
+            if last_space > length * 0.7:  # If we can break at a reasonable point
+                return truncated[:last_space] + '...'
+            else:
+                return truncated + '...'
+        except (TypeError, AttributeError):
+            return str(text)[:length] + '...' if text else ''
+
+    @app.template_filter('capitalize_words')
+    def capitalize_words(text):
+        """Capitalize each word in the text"""
+        try:
+            return str(text).title() if text else ''
+        except (TypeError, AttributeError):
+            return ''
+
+    @app.template_filter('format_percentage')
+    def format_percentage(value, decimals=1):
+        """Format a decimal as a percentage"""
+        try:
+            return f"{float(value) * 100:.{decimals}f}%"
+        except (ValueError, TypeError):
+            return "0%"
+
+    @app.template_filter('status_badge')
+    def status_badge(status):
+        """Get Bootstrap badge class for various statuses"""
+        status_str = str(status).lower()
+        status_map = {
+            'active': 'success',
+            'inactive': 'secondary',
+            'pending': 'warning',
+            'expired': 'danger',
+            'draft': 'info',
+            'approved': 'success',
+            'rejected': 'danger',
+            'under_review': 'warning',
+            'completed': 'success',
+            'in_progress': 'primary',
+            'not_started': 'secondary',
+            'overdue': 'danger',
+            'open': 'warning',
+            'closed': 'success',
+            'cancelled': 'secondary'
+        }
+        return status_map.get(status_str, 'secondary')
+
+    print("✓ Custom Jinja2 filters registered successfully")
+    
+    # ========================================
+    # END OF CUSTOM JINJA2 FILTERS
+    # ========================================
     
     # Track loaded blueprints
     blueprints_loaded = []
@@ -142,6 +340,17 @@ def create_app():
         output.append("<h2>Blueprint Status</h2>")
         output.append(f"<p><strong>Loaded:</strong> {', '.join(blueprints_loaded)}</p>")
         output.append(f"<p><strong>Errors:</strong> {', '.join(blueprint_errors) if blueprint_errors else 'None'}</p>")
+        
+        output.append("<h2>Custom Jinja2 Filters</h2>")
+        filter_list = [
+            'timestamp_to_date', 'relative_time', 'format_file_size', 
+            'hazard_level_color', 'hazard_level_icon', 'country_flag',
+            'truncate_smart', 'capitalize_words', 'format_percentage', 'status_badge'
+        ]
+        output.append("<ul>")
+        for filter_name in filter_list:
+            output.append(f"<li>✓ {filter_name}</li>")
+        output.append("</ul>")
         
         output.append("<h2>Quick Actions</h2>")
         output.append("<a href='/sds/' style='padding: 8px 16px; background: #007bff; color: white; text-decoration: none; border-radius: 4px; margin: 5px;'>Try SDS List</a>")
@@ -347,7 +556,12 @@ def create_app():
                 "flask_env": os.environ.get("FLASK_ENV", "production"),
                 "render": bool(os.environ.get('RENDER')),
                 "secret_key_set": bool(os.environ.get("SECRET_KEY"))
-            }
+            },
+            "jinja2_filters": [
+                "timestamp_to_date", "relative_time", "format_file_size", 
+                "hazard_level_color", "hazard_level_icon", "country_flag",
+                "truncate_smart", "capitalize_words", "format_percentage", "status_badge"
+            ]
         }
         
         # Determine overall health
@@ -478,6 +692,7 @@ if __name__ == "__main__":
     print("🤖 Enhanced AI Chatbot with fixed error handling")
     print("🔧 All routes properly registered with unique names")
     print("📋 SDS system auto-initialized for Render")
+    print("🎨 Custom Jinja2 filters for enhanced templating")
     print("=" * 60)
     
     app.run(host="0.0.0.0", port=port, debug=debug)
