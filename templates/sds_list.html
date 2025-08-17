@@ -1,4 +1,4 @@
-<!-- templates/sds_list.html - Proper SDS Template with Real Data -->
+<!-- templates/sds_list.html - Fixed SDS Template without external dependencies -->
 {% extends "base.html" %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -325,16 +325,15 @@
                         </td>
                         <td>
                             {% if sds.created_date %}
-                            {% set date = sds.created_date|int %}
-                            {% set date_obj = moment(date * 1000) %}
+                            {% set timestamp = sds.created_date|int %}
                             <div class="small">
-                                <div>{{ date_obj.format('MM/DD/YYYY') }}</div>
+                                <div>{{ (timestamp * 1000)|timestamp_to_date }}</div>
                                 {% if sds.is_new %}
                                 <div class="text-success">New</div>
                                 {% elif sds.is_outdated %}
                                 <div class="text-warning">Outdated</div>
                                 {% else %}
-                                <div class="text-muted">{{ date_obj.fromNow() }}</div>
+                                <div class="text-muted">{{ (timestamp * 1000)|relative_time }}</div>
                                 {% endif %}
                             </div>
                             {% else %}
@@ -535,6 +534,25 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('ageFilter').value = '';
         applyFilters();
     };
+    
+    // Format dates using native JavaScript
+    window.formatDate = function(timestamp) {
+        const date = new Date(timestamp);
+        return date.toLocaleDateString();
+    };
+    
+    window.formatRelativeTime = function(timestamp) {
+        const now = new Date();
+        const date = new Date(timestamp);
+        const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
+        
+        if (diffDays === 0) return 'Today';
+        if (diffDays === 1) return 'Yesterday';
+        if (diffDays < 7) return `${diffDays} days ago`;
+        if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+        if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
+        return `${Math.floor(diffDays / 365)} years ago`;
+    };
 });
 
 // SDS Action Functions
@@ -545,9 +563,9 @@ function showQR(sdsId) {
     
     document.getElementById('qrProductName').textContent = sds.product_name;
     
-    // Show QR code (simplified - you'd generate actual QR here)
+    // Show QR code placeholder (you'd generate actual QR with qrcode library)
     document.getElementById('qrCodeContainer').innerHTML = 
-        `<div class="bg-light p-4 rounded"><i class="bi bi-qr-code" style="font-size: 4rem;"></i></div>`;
+        `<div class="bg-light p-4 rounded"><i class="bi bi-qr-code" style="font-size: 4rem;"></i><br><small>QR Code for ${sds.product_name}</small></div>`;
     
     modal.show();
 }
@@ -562,7 +580,6 @@ function editSDS(sdsId) {
 
 function archiveSDS(sdsId) {
     if (confirm('Archive this SDS? It will be moved to the archive.')) {
-        // Archive functionality
         alert('SDS archived successfully');
     }
 }
@@ -601,12 +618,20 @@ function showAnalytics() {
     alert('Analytics modal would open here');
 }
 
+function showComparison() {
+    alert('SDS comparison tool would open here');
+}
+
 function bulkAIIndex() {
     alert('Bulk AI indexing would start');
 }
 
 function exportAll() {
     alert('Export functionality would trigger');
+}
+
+function toggleView(viewType) {
+    alert(`Switch to ${viewType} view`);
 }
 </script>
 
@@ -670,4 +695,44 @@ function exportAll() {
     }
 }
 </style>
+
+<!-- Custom Jinja2 filters for date formatting (add to your app.py) -->
+{% if false %}
+<!-- 
+Add these custom filters to your app.py:
+
+from datetime import datetime
+
+@app.template_filter('timestamp_to_date')
+def timestamp_to_date(timestamp):
+    try:
+        dt = datetime.fromtimestamp(timestamp / 1000)
+        return dt.strftime('%m/%d/%Y')
+    except:
+        return 'Unknown'
+
+@app.template_filter('relative_time')
+def relative_time(timestamp):
+    try:
+        now = datetime.now()
+        dt = datetime.fromtimestamp(timestamp / 1000)
+        diff = now - dt
+        days = diff.days
+        
+        if days == 0:
+            return 'Today'
+        elif days == 1:
+            return 'Yesterday'
+        elif days < 7:
+            return f'{days} days ago'
+        elif days < 30:
+            return f'{days // 7} weeks ago'
+        elif days < 365:
+            return f'{days // 30} months ago'
+        else:
+            return f'{days // 365} years ago'
+    except:
+        return 'Unknown'
+-->
+{% endif %}
 {% endblock %}
