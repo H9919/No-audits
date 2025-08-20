@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Smart EHS Assistant</title>
+  <title>YZ-AI Assistant</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -53,7 +53,7 @@
   <!-- Sidebar -->
   <aside class="sidebar" id="sidebar">
     <div class="p-3 border-bottom border-white border-opacity-10">
-      <h4 class="m-0"><i class="bi bi-shield-check me-2"></i>Smart EHS</h4>
+      <h4 class="m-0"><i class="bi bi-robot me-2"></i>YZ-AI</h4>
     </div>
     <div class="p-2 small text-uppercase text-white-50">Dashboard</div>
     <a class="nav-item active" href="/"><i class="bi bi-robot me-2"></i>AI Assistant</a>
@@ -94,8 +94,8 @@
       <div class="d-flex align-items-center gap-2">
         <button class="btn btn-light d-md-none" id="menuBtn"><i class="bi bi-list"></i></button>
         <div>
-          <div class="fw-semibold">EHS Assistant</div>
-          <div class="text-muted small">Your intelligent Environmental, Health & Safety companion</div>
+          <div class="fw-semibold">YZ-AI Assistant</div>
+          <div class="text-muted small">Your intelligent AI companion</div>
         </div>
       </div>
       <span class="badge bg-success"><i class="bi bi-circle-fill me-1" style="font-size:.5rem"></i>Online</span>
@@ -108,7 +108,7 @@
           <div class="mx-auto mb-3" style="width:76px;height:76px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#3b82f6);display:flex;align-items:center;justify-content:center;color:#fff;font-size:2rem">
             <i class="bi bi-robot"></i>
           </div>
-          <h2 class="h4">Welcome to Smart EHS</h2>
+          <h2 class="h4">Welcome to YZ-AI</h2>
           <p class="text-muted">Report incidents, assess risks, manage CAPAs, find SDS—and more. What would you like to do?</p>
         </div>
         <div class="quick">
@@ -130,9 +130,9 @@
           </div>
           <div class="card quick-card" onclick="sendMessage('Show me what needs my attention today')">
             <div class="card-body d-flex gap-2 align-items-start"><div>⚡</div>
-              <div><b>What’s Urgent?</b><div class="text-muted small">Overdue & priority</div></div></div>
+              <div><b>What's Urgent?</b><div class="text-muted small">Overdue & priority</div></div></div>
           </div>
-          <div class="card quick-card" onclick="sendMessage('Help me get started with the EHS system')">
+          <div class="card quick-card" onclick="sendMessage('Help me get started with the AI system')">
             <div class="card-body d-flex gap-2 align-items-start"><div>🎯</div>
               <div><b>System Tour</b><div class="text-muted small">Feature walkthrough</div></div></div>
           </div>
@@ -183,7 +183,7 @@
     wrap.innerHTML = `
       <div class="hdr">
         <div class="avatar ${who==='user'?'user':'ai'}">${who==='user'?'You':'AI'}</div>
-        <div class="fw-semibold">${who==='user'?'You':'EHS Assistant'}</div>
+        <div class="fw-semibold">${who==='user'?'You':'YZ-AI Assistant'}</div>
         <div class="time">${timeNow()}</div>
       </div>
       <div class="content">${formatHtml(text||'')}</div>`;
@@ -264,7 +264,7 @@
   // ---- Events
   document.addEventListener('DOMContentLoaded', () => {
     // greet
-    addMessage('ai',"👋 Hello! I'm your Smart EHS Assistant. How can I help?");
+    addMessage('ai',"👋 Hello! I'm your YZ-AI Assistant. How can I help?");
     // stats & CAPA list
     refreshStats(); loadCapas();
     setInterval(refreshStats, 30000);
@@ -410,10 +410,10 @@
   // ---- Reset (UI + server)
   async function resetChat(){
     historyBuf=[]; fiveActive=false; selFile=null; msg.value=''; file.value=''; $('#filePreview').classList.add('d-none');
-    chat.innerHTML=''; document.title='Smart EHS Assistant';
+    chat.innerHTML=''; document.title='YZ-AI Assistant';
     // show welcome again
     const w = document.getElementById('welcome'); if (w) w.style.display='block';
-    addMessage('ai',"👋 Hello! I'm your Smart EHS Assistant. How can I help?");
+    addMessage('ai',"👋 Hello! I'm your YZ-AI Assistant. How can I help?");
     try{ await fetch('/chat/reset',{method:'POST'}); }catch{}
   }
 
