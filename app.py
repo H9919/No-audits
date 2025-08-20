@@ -247,7 +247,7 @@ def create_app():
     blueprint_configs = [
         ("routes.sds", "sds_bp", "/sds", "SDS"),
         ("routes.incidents", "incidents_bp", "/incidents", "Incidents"),
-        ("routes.chatbot", "chatbot_bp", "/", "Enhanced Chatbot"),
+        ("routes.chatbot", "chatbot_bp", "/", "YZ-AI Assistant"),
         ("routes.capa", "capa_bp", "/capa", "CAPA"),
         ("routes.risk", "risk_bp", "/risk", "Risk Management"),
         ("routes.safety_concerns", "safety_concerns_bp", "/safety-concerns", "Safety Concerns"),
@@ -543,7 +543,7 @@ def create_app():
                 "core_count": len(blueprints_loaded),
                 "error_count": len(blueprint_errors),
                 "sds_available": "SDS" in blueprints_loaded,
-                "chatbot_available": "Enhanced Chatbot" in blueprints_loaded
+                "chatbot_available": "YZ-AI Assistant" in blueprints_loaded
             },
             "storage": {
                 "data_directory": os.path.exists("/tmp/sds_data" if os.environ.get('RENDER') else "data"),
@@ -565,7 +565,7 @@ def create_app():
         }
         
         # Determine overall health
-        critical_modules = ["Enhanced Chatbot", "Incidents", "SDS"]
+        critical_modules = ["YZ-AI Assistant", "Incidents", "SDS"]
         critical_available = sum(1 for module in critical_modules if module in blueprints_loaded)
         
         if critical_available < 2:
@@ -682,14 +682,14 @@ if __name__ == "__main__":
     debug = os.environ.get("FLASK_ENV") == "development"
     
     print("=" * 60)
-    print("🚀 Starting Smart EHS Management System")
+    print("🚀 Starting YZ-AI Management System")
     print("=" * 60)
     print(f"Environment: {'🌐 Render' if os.environ.get('RENDER') else '💻 Local Development'}")
     print(f"Port: {port}")
     print(f"Debug mode: {debug}")
     print(f"Python version: {sys.version.split()[0]}")
     print(f"Storage: {'Ephemeral (/tmp)' if os.environ.get('RENDER') else 'Persistent (data/)'}")
-    print("🤖 Enhanced AI Chatbot with fixed error handling")
+    print("🤖 YZ-AI Assistant with fixed error handling")
     print("🔧 All routes properly registered with unique names")
     print("📋 SDS system auto-initialized for Render")
     print("🎨 Custom Jinja2 filters for enhanced templating")
